@@ -6,18 +6,18 @@
 ####################
 
 ### Define working directory
-setwd('C:/Users/tpriest/OneDrive - ETH Zurich/MPI - FRAM/WSC')
+setwd('') # Set the working directory as the directory where the data_files/ of this repository were downloaded to
 
 ### Load libraries
-library(chemodiv)
 library(ggplot2)
 library(RColorBrewer)
-library(hillR)
 library(dplyr)
 library(vegan)
 library(Hmisc)
 library(iNEXT)
 library(forcats)
+library(confintr)
+library(splancs)
 
 options(scipen=999)
 
@@ -163,7 +163,7 @@ correct_and_filter_cor_results <- function(cor_df){
 }
 
 # Run above functions to create a dataframe containing correlation coefficients
-# associated with adjust p-values < 0.05
+# associated with adjusted p-values < 0.05
 mic_alpha_vs_env_cor_results = diversity_vs_env_correlation(mic_alpha_with_meta, sample_meta_stand)
 mic_alpha_vs_env_cor_df = process_correlation_matrix(mic_alpha_vs_env_cor_results$r,mic_alpha_vs_env_cor_results$P)
 mic_alpha_vs_env_cor_sig_df = correct_and_filter_cor_results(mic_alpha_vs_env_cor_df)
@@ -172,6 +172,63 @@ euk_alpha_vs_env_cor_results = diversity_vs_env_correlation(euk_alpha_with_meta,
 euk_alpha_vs_env_cor_df = process_correlation_matrix(euk_alpha_vs_env_cor_results$r,euk_alpha_vs_env_cor_results$P)
 euk_alpha_vs_env_cor_sig_df = correct_and_filter_cor_results(euk_alpha_vs_env_cor_df)
 
+### Now we want to calculate and add in the confidence intervals for our
+### coefficients with a p-value < 0.05
+
+### FUNCTION: calculate confidence interval for correlation coefficients
+calculate_ci <- function(correlation, n) {
+  z <- 0.5 * log((1 + correlation) / (1 - correlation))
+  se <- 1 / sqrt(n - 3)
+  alpha <- 0.05  # 95% confidence interval
+  z_critical <- qnorm(1 - alpha / 2)
+  ci <- tanh(c(z - z_critical * se, z + z_critical * se))
+  return(ci)
+}
+
+# Add in columns to store the lower and upper bound confidence intervals
+ci_lower <- numeric(nrow(mic_alpha_vs_env_cor_sig_df))
+ci_upper <- numeric(nrow(mic_alpha_vs_env_cor_sig_df))
+
+# Loop through significant correlation dataframe and calculate confidence intervals
+for (i in 1:nrow(mic_alpha_vs_env_cor_sig_df)) {
+  correlation <- mic_alpha_vs_env_cor_sig_df$cor[i]
+  n <- 97
+  ci <- calculate_ci(correlation, n)
+  ci_lower[i] <- ci[1]
+  ci_upper[i] <- ci[2]
+}
+
+# Add the confidence intervals to the respective columns
+mic_alpha_vs_env_cor_sig_df$ci_lower <- ci_lower
+mic_alpha_vs_env_cor_sig_df$ci_upper <- ci_upper
+
+### Repeat above steps for microeukaryotic correlations
+ci_lower <- numeric(nrow(euk_alpha_vs_env_cor_sig_df))
+ci_upper <- numeric(nrow(euk_alpha_vs_env_cor_sig_df))
+
+# Loop through significant correlation dataframe and calculate confidence intervals
+for (i in 1:nrow(euk_alpha_vs_env_cor_sig_df)) {
+  correlation <- euk_alpha_vs_env_cor_sig_df$cor[i]
+  n <- 96
+  ci <- calculate_ci(correlation, n)
+  ci_lower[i] <- ci[1]
+  ci_upper[i] <- ci[2]
+}
+
+# Add the confidence intervals to the respective columns
+euk_alpha_vs_env_cor_sig_df$ci_lower <- ci_lower
+euk_alpha_vs_env_cor_sig_df$ci_upper <- ci_upper
+
+### Export the dataframes containing information on significant correlation results
+write.table(mic_alpha_vs_env_cor_sig_df,
+            file = "figures_output/FRAM_RAS_F4_MIC_div_vs_env_correlation_df.txt", 
+            sep = "\t")
+
+write.table(euk_alpha_vs_env_cor_sig_df,
+            file = "figures_output/FRAM_RAS_F4_EUK_div_vs_env_correlation_df.txt", 
+            sep = "\t")
+
+###
 ### FUNCTION: visualise significant correlations
 plot_sig_cor_hits <- function(infile){
   ggplot(infile, aes(y=row, x=column)) +
@@ -317,7 +374,7 @@ for (selectmonth in months) {
     select(MDS1, MDS2) %>%
     as.matrix() %>%
     areapl(.)
-  
+  <
   # Store the results in respective vectors
   euk_areas <- c(euk_areas, euk_area)
   prok_areas <- c(prok_areas, prok_area)
