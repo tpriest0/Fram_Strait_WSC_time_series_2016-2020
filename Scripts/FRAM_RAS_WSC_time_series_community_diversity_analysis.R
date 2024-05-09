@@ -50,7 +50,7 @@ mic_asv_filt_taxa=read.table(file="RAS_F4_MIC_ASV_filt_taxa.txt", sep="\t",
   mutate(across(is.numeric, ~ .* 100))
 
 # Import sample metadata
-sample_meta=read.table(file="RAS_F4_META_MIC_Amplicon.txt", sep="\t",
+sample_meta=read.table(file="RAS_F4_META.txt", sep="\t",
                        check.names=F, header=T) %>%
   mutate(date = as.Date(date, "%d.%m.%Y"))
 
