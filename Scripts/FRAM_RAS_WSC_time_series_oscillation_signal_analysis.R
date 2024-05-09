@@ -340,7 +340,7 @@ mic_clust_func_rel_abund_wide =
 # The functional profile will now be subject to fourier transformation and then
 # combined with the prokaryotic ASV oscillations in a network analysis
 write.table(mic_clust_func_rel_abund_wide,
-            file="RAS_F4_MIC_GENE_OSC4_FUNC_rel_abund_wide.txt",
+            file="RAS_F4_MIC_OSC4_FUNC_CLUST_rel_abund_wide.txt",
             sep="\t")
 
 ### What is the average relative abundance of functional gene groups across samples
