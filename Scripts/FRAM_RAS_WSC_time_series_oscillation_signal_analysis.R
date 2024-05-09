@@ -20,24 +20,9 @@ library(tibble)
 ### Import files
 options(scipen=999)
 
-# Import microbial ASV oscillation signal patterns
-mic_asv_oscillation_py=read.table(file="RAS_F4_MIC_ASV_num_osc_per_year.csv", 
-                                  sep=",", check.names=F, header=T) %>%
-  mutate(type = "MIC_ASV") %>%
-  dplyr::rename(., ID = asv)
-
-# Import gene clusters (95% ANI clusters) oscillation signal patterns
-mic_clust_oscillation_py=read.table(file="FRAM_RAS_F4_MIC_GENE_CLUST_num_osc_per_year.csv", 
-                                   sep=",", check.names=F, row.names=NULL, header=T) %>%
-  dplyr::select(asv,year,oscillations) %>%
-  mutate(type = "MIC_GENE_CLUSTERS") %>%
-  dplyr::rename(., ID = asv)
-
-# Import eukaryotic ASV oscillation signal patterns
-euk_asv_oscillation_py=read.table(file="RAS_F4_EUK_ASV_num_osc_per_year.csv", 
-                                  sep=",", check.names=F, header=T) %>%
-  mutate(type = "EUK_ASV") %>%
-  dplyr::rename(., ID = asv)
+# Import ASV and gene cluster oscillation signal patterns
+oscillations_per_year=read.table(file="RAS_F4_ASV_and_GENE_CLUST_oscillations_per_year.txt", 
+                                  sep="\t", check.names=F, header=T)
 
 # Import microbial ASV relative abundance data
 mic_asv_rel=read.table(file="RAS_F4_MIC_ASV_filt_rare_rel.txt", sep="\t",
@@ -62,7 +47,8 @@ mic_clust_rel=read.table(
 
 ### Assess the oscillation signal data retrieved from the time-series analysis
 # How many microbial ASVs could an oscillation be determined?
-mic_asv_oscillation_py %>%
+oscillations_per_year %>%
+  filter(., grepl("PROK_ASV",Type)) %>%
   select(ID) %>%
   unique() %>%
   dim()
@@ -70,7 +56,8 @@ dim(mic_asv_rel)
 (933/3748)*100
 
 # How many exhibited one oscillation per annual cycle?
-mic_asv_oscillation_py %>%
+oscillations_per_year %>%
+  filter(., grepl("PROK_ASV",Type)) %>%
   filter(., oscillations == 1) %>%
   select(ID) %>%
   as.data.frame() %>%
@@ -79,17 +66,19 @@ mic_asv_oscillation_py %>%
   as.data.frame() %>%
   filter(., Freq == 4) %>%
   dim()
-(658/933)*100
+(658/3748)*100
 
 # Repeat above steps for EUK
-euk_asv_oscillation_py %>%
+oscillations_per_year %>%
+  filter(., grepl("EUK_ASV",Type)) %>%
   select(ID) %>%
   unique() %>%
   dim()
 dim(euk_asv_rel)
 (1019/3019)*100
 
-euk_asv_oscillation_py %>%
+oscillations_per_year %>%
+  filter(., grepl("EUK_ASV",Type)) %>%
   filter(., oscillations == 1) %>%
   select(ID) %>%
   as.data.frame() %>%
@@ -98,15 +87,17 @@ euk_asv_oscillation_py %>%
   as.data.frame() %>%
   filter(., Freq == 4) %>%
   dim()
-(448/1019)*100
+(448/3019)*100
 
 # Repeat above steps for gene clusters
-mic_clust_oscillation_py %>%
+oscillations_per_year %>%
+  filter(., grepl("PROK_GENE_CLUST",Type)) %>%
   select(ID) %>%
   unique() %>%
   dim()
 
-mic_clust_oscillation_py %>%
+oscillations_per_year %>%
+  filter(., grepl("PROK_GENE_CLUST",Type)) %>%
   filter(., oscillations == 1) %>%
   select(ID) %>%
   as.data.frame() %>%
@@ -116,19 +107,6 @@ mic_clust_oscillation_py %>%
   dim()
 (482923/704158)*100
 
-# Combine ASV and GENE oscillation dataframes and calculate mean number of oscillations 
-# per year
-mic_euk_asv_gene_clust_mean_osc_per_year = rbind(mic_asv_oscillation_py,
-                                       euk_asv_oscillation_py,
-                                       mic_clust_oscillation_py) %>%
-  aggregate(oscillations~ID+type, data=., FUN=mean) %>%
-  mutate(oscillations = as.numeric(oscillations))
-
-# How many ASVs and gene clusters show oscillation of 1 per year?
-mic_euk_asv_gene_clust_mean_osc_per_year %>%
-  filter(oscillations == 1) %>%
-  mutate(count = 1) %>%
-  aggregate(count~type+oscillations, data=., FUN=sum)
 
 ### Determine fraction of community represented by each oscillation type
 
@@ -138,12 +116,12 @@ calc_rel_abund_per_osc <- function(infile){
   osc_abund_df = 
     infile %>% 
     tibble::rownames_to_column(., var="ID") %>%
-    filter(ID %in% mic_euk_asv_gene_clust_mean_osc_per_year$ID) %>%
+    filter(ID %in% oscillations_per_year$ID) %>%
     reshape2::melt(id.vars="ID", variable.name="RAS_id", value.name="Rel_abund") %>%
-    left_join(mic_euk_asv_gene_clust_mean_osc_per_year, by="ID") %>%
+    left_join(oscillations_per_year, by="ID") %>%
     mutate(Rel_abund = as.numeric(Rel_abund)) %>%
-    aggregate(Rel_abund~RAS_id+type+oscillations, data=., FUN=sum) %>%
-    mutate(oscillations = round(as.numeric(oscillations),3)) 
+    aggregate(Rel_abund~RAS_id+Type+Oscillations, data=., FUN=sum) %>%
+    mutate(Oscillations = round(as.numeric(Oscillations),3)) 
   return(osc_abund_df)
 }
 
@@ -161,7 +139,7 @@ asv_gene_rel_prop_per_oscillation <-
 # Calculate the combined, mean relative abundance of asvs and genes
 # with different oscillation signals
 asv_gene_rel_prop_per_oscillation %>%
-  group_by(type,oscillations) %>%
+  group_by(type,Oscillations) %>%
   summarise(mean_per_osc = mean(Rel_abund)) %>%
   as.data.frame()
 
@@ -169,8 +147,8 @@ asv_gene_rel_prop_per_oscillation %>%
 ### oscillation signals 
 plot_rel_prop_per_oscillation = function(infile){
   ggplot(data=infile,
-         aes(y = oscillations, x = Rel_abund)) +
-    geom_boxplot(aes(group=oscillations)) + 
+         aes(y = Oscillations, x = Rel_abund)) +
+    geom_boxplot(aes(group=Oscillations)) + 
     facet_wrap(type~., scales="free_x", nrow = 4,
                strip.position = "top") + 
     theme_bw() + 
@@ -188,7 +166,7 @@ plot_rel_prop_per_oscillation = function(infile){
 ### Visualise number of oscillations per year for ASVs and GENEs
 plot_num_oscillations_py = function(infile){
   ggplot(data=infile,
-         aes(y = oscillations)) +
+         aes(y = Oscillations)) +
     geom_histogram() + 
     facet_wrap(type~., scales = "free_x", nrow = 4) + 
     theme_bw() + 
@@ -204,7 +182,7 @@ plot_num_oscillations_py = function(infile){
 } 
 
 ### Create figure illustrating mean oscillations and rel prop per oscillation signal
-plot_asv_gene_mean_osc_per_year <- plot_num_oscillations_py(mic_euk_asv_gene_clust_mean_osc_per_year)
+plot_asv_gene_mean_osc_per_year <- plot_num_oscillations_py(oscillations_per_year)
 plot_asv_gene_rel_prop_per_osc <- plot_rel_prop_per_oscillation(asv_gene_rel_prop_per_oscillation)
 
 # Export figure
@@ -221,9 +199,10 @@ dev.off()
 #####
 
 ### FUNCTION - Identify those with one oscillation each year
-create_osc4_id_list <- function(infile){
+create_osc4_id_list <- function(infile, grouping){
   infile %>%
-  reshape2::dcast(ID~year, value.var="oscillations", data=.,) %>%
+    filter(., grepl(grouping, Type, fixed=FALSE)) %>%
+    reshape2::dcast(ID~year, value.var="Oscillations", data=.,) %>%
     filter(ID == case_when(
       year1 == 1 &
         year2 == 1 &
@@ -234,9 +213,9 @@ create_osc4_id_list <- function(infile){
 }
 
 # Run function and combine ASV and GENE output dataframes
-mic_asv_osc4_id_list <- create_osc4_id_list(mic_asv_oscillation_py)
-euk_asv_osc4_id_list <- create_osc4_id_list(euk_asv_oscillation_py)
-mic_clust_osc4_id_list <- create_osc4_id_list(mic_clust_oscillation_py)
+mic_asv_osc4_id_list <- create_osc4_id_list(oscillations_per_year, "PROK_ASV")
+euk_asv_osc4_id_list <- create_osc4_id_list(oscillations_per_year, "EUK_ASV")
+mic_clust_osc4_id_list <- create_osc4_id_list(oscillations_per_year, "PROK_GENE_CLUST")
 mic_euk_asv_gene_clust_osc4_id_list <- rbind(mic_asv_osc4_id_list,
                                        euk_asv_osc4_id_list,
                                        mic_clust_osc4_id_list)
