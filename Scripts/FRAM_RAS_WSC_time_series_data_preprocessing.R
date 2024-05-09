@@ -8,12 +8,18 @@
 # Define working directory
 setwd('XXXXX')
 
-# Load libaries
+
+#####
+
+### Load libaries
+
 library(dplyr)
 library(vegan)
 library(reshape2)
 library(ggplot2)
 library(tibble)
+
+#####
 
 ### Import data
 
@@ -33,8 +39,12 @@ euk_asv_raw=read.table(file="RAS_F4_EUK_ASV_raw_counts.txt", sep="\t",
 euk_asv_taxa=read.table(file="RAS_F4_EUK_ASV_taxa.txt", sep="\t",
                         check.names=F, header=T)
 
-### Identify ASVs with less than 3 counts in less than 3 samples and remove them
-# Filter ASV dataset and create list of ASV names passing filtering
+##### 
+
+### Remove low abundant ASVs
+
+# Identify ASVs with less than 3 counts in less than 3 samples and remove them
+
 mic_asv_filt_names <- mic_asv_raw %>%
   tibble::column_to_rownames(., var="ASV_name") %>%
   mutate(across(where(is.numeric), function(x) ifelse(x < 3, 0, x))) %>%
@@ -61,7 +71,7 @@ euk_asv_filt_raw_wide = euk_asv_raw %>%
   filter(ASV_name %in% euk_asv_filt_names$ASV_name) %>%
   tibble::column_to_rownames(., var = "ASV_name")
 
-# Calculate relative abundace from raw counts of filtered ASVs
+### Generate relative abundance tables from filtered ASV data
 mic_asv_filt_rel = 
   as.data.frame(mic_asv_filt_raw_wide) %>%
   decostand(., method="total", MARGIN=2) %>%
@@ -72,9 +82,12 @@ euk_asv_filt_rel =
   decostand(., method="total", MARGIN=2) %>%
   tibble::rownames_to_column(., var="ASV_name")
 
+##### 
+
 ### Rarefy data
 
-## Prokaryotic
+### Prokaryotic ASVs
+
 # Identify smallest read count across prokaryotic samples and rarefy the data
 head(sort(colSums(mic_asv_filt_raw_wide)))
 
@@ -84,7 +97,8 @@ mic_smallest_count <- min(colSums(mic_asv_filt_raw_wide))
 
 mic_asv_filt_rarefied = t(rrarefy(t(mic_asv_filt_raw_wide), mic_smallest_count))
 
-## Microeukaryotic
+### Microeukaryotic ASVs
+
 # Identify smallest read count
 head(sort(colSums(euk_asv_filt_raw_wide)))
 
@@ -95,7 +109,7 @@ euk_smallest_count <- min(colSums(euk_asv_filt_raw_mod))
 
 euk_asv_filt_rarefied = t(rrarefy(t(euk_asv_filt_raw_mod), euk_smallest_count))
 
-### Create relative abundance tables
+### Create relative abundance tables from rarefied data
 mic_asv_filt_rarefied_rel = 
   as.data.frame(mic_asv_filt_rarefied) %>%
   decostand(., method="total", MARGIN=2) %>%
@@ -111,26 +125,29 @@ euk_asv_filt_rarefied_rel =
 ### in further analysis
 euk_asv_filt_rel_mod = subset(euk_asv_filt_rel, select=-c(`02_2018_F4_2`))
 
-### Export all tables
-## Export tables
-write.table(mic_asv_filt_raw_wide,
-            file="ARAS_F4_MIC_ASV_filt_raw.txt", sep="\t")
-write.table(mic_asv_filt_rel,
-            file="RAS_F4_MIC_ASV_filt_rel.txt", sep="\t")
-write.table(euk_asv_filt_raw_mod,
-            file="RAS_F4_EUK_ASV_filt_raw.txt", sep="\t")
-write.table(euk_asv_filt_rel_mod,
-            file="RAS_F4_EUK_ASV_filt_rel.txt", sep="\t") 
-write.table(mic_asv_filt_rarefied,
-            file="RAS_F4_MIC_ASV_filt_rare_raw.txt", sep="\t")
-write.table(euk_asv_filt_rarefied,
-            file="RAS_F4_EUK_ASV_filt_rare_raw.txt", sep="\t")
-write.table(mic_asv_filt_rarefied_rel,
-            file="RAS_F4_MIC_ASV_filt_rare_rel.txt", sep="\t")
-write.table(euk_asv_filt_rarefied_rel,
-            file="RAS_F4_EUK_ASV_filt_rare_rel.txt", sep="\t")
+### Export tables
 
-### Filter taxa tables to include only those ASVs that passed filtering 
+write.table(mic_asv_filt_raw_wide,
+            file="RAS_F4_MIC_ASV_filt_raw.txt", sep="\t", row.names = F, quote = F)
+write.table(mic_asv_filt_rel,
+            file="RAS_F4_MIC_ASV_filt_rel.txt", sep="\t", row.names = F, quote = F)
+write.table(euk_asv_filt_raw_mod,
+            file="RAS_F4_EUK_ASV_filt_raw.txt", sep="\t", row.names = F, quote = F)
+write.table(euk_asv_filt_rel_mod,
+            file="RAS_F4_EUK_ASV_filt_rel.txt", sep="\t", row.names = F, quote = F) 
+write.table(mic_asv_filt_rarefied,
+            file="RAS_F4_MIC_ASV_filt_rare_raw.txt", sep="\t", row.names = F, quote = F)
+write.table(euk_asv_filt_rarefied,
+            file="RAS_F4_EUK_ASV_filt_rare_raw.txt", sep="\t", row.names = F, quote = F)
+write.table(mic_asv_filt_rarefied_rel,
+            file="RAS_F4_MIC_ASV_filt_rare_rel.txt", sep="\t", row.names = F, quote = F)
+write.table(euk_asv_filt_rarefied_rel,
+            file="RAS_F4_EUK_ASV_filt_rare_rel.txt", sep="\t", row.names = F, quote = F)
+
+#####
+
+### Filtering taxa tables based on subset of ASVs
+
 mic_asv_taxa_filt = 
   mic_asv_taxa %>%
   filter(., ASV_name %in% rownames(mic_asv_filt_rarefied))
@@ -141,52 +158,35 @@ euk_asv_taxa_filt =
 
 # Export tables 
 write.table(mic_asv_taxa_filt,
-            file="ASV/RAS_F4_MIC_ASV_filt_taxa.txt", sep="\t")
+            file="RAS_F4_MIC_ASV_filt_taxa.txt", sep="\t")
 write.table(euk_asv_taxa_filt,
-            file="ASV/RAS_F4_EUK_ASV_filt_taxa.txt", sep="\t")
+            file="RAS_F4_EUK_ASV_filt_taxa.txt", sep="\t")
 
-###
+#####
 
 ### Processing and reformatting metagenome gene cluster profiles
 
-# Import metdata
-ras_metadata=read.table(file="RAS_F4_META_METAG.txt", sep="\t",
-                        check.names=F, header=T)
-
-# Import functional gene profile
+# Import gene cluster profile
 ras_mg_geneclust_profile=read.table(
-  file="metagenomes/community_gene_profiles/FRAM_RAS_F4_GENES_CLUSTID_abund_filt.txt",
+  file="RAS_F4_GENES_CLUSTID_abund_filt.txt",
   sep="\t",check.names=F, header=T)
-
-# Create metagenome sample name to RAS_id mapping file
-name_list = ras_metadata %>%
-  select(metaG_sample_title,RAS_id)
-View(name_list)
-
-ras_mg_geneclust_profile %>%
-  select(Sample) %>%
-  unique() %>%
-  dim()
 
 # Create wide format raw count table with RAS_id headers
 ras_mg_geneclust_profile_raw_wide = 
   ras_mg_geneclust_profile %>%
-  left_join(name_list, by=c("Sample" = "metaG_sample_title")) %>%
   select(RAS_id,clustID,Count) %>%
   dcast(clustID~RAS_id, value.var="Count", data=.)
 
 # Create wide format normalised abundance table
 ras_mg_geneclust_profile_norm_wide = 
   ras_mg_geneclust_profile %>%
-  left_join(name_list, by=c("Sample" = "metaG_sample_title")) %>%
   select(RAS_id,clustID,Norm_count) %>%
   reshape2::dcast(clustID~RAS_id, value.var="Norm_count", data=.) %>%
   replace(., is.na(.), 0)
 
 # Create wide format relative abundance table
 ras_mg_geneclust_profile_rel_prop_wide =
-  ras_mg_func_profile %>%
-  left_join(name_list, by=c("Sample" = "metaG_sample_title")) %>%
+  ras_mg_geneclust_profile %>%
   select(RAS_id,clustID,Norm_count) %>%
   reshape2::dcast(clustID~RAS_id, value.var="Norm_count", data=.) %>%
   replace(., is.na(.), 0) %>%
@@ -196,14 +196,15 @@ ras_mg_geneclust_profile_rel_prop_wide =
 
 
 ### Export tables
+
 write.table(ras_mg_geneclust_profile_raw_wide,
-            file="metagenomes/community_gene_profiles/FRAM_RAS_F4_GENE_CLUSTID_filt_raw_wide.txt",
+            file="RAS_F4_GENE_CLUSTID_filt_raw_wide.txt",
             sep="\t")
 
 write.table(ras_mg_geneclust_profile_norm_wide,
-            file="metagenomes/community_gene_profiles/FRAM_RAS_F4_GENE_CLUSTID_filt_norm_wide.txt",
+            file="RAS_F4_GENE_CLUSTID_filt_norm_wide.txt",
             sep="\t")
 
 write.table(ras_mg_geneclust_profile_rel_prop_wide,
-            file="metagenomes/community_gene_profiles/FRAM_RAS_F4_GENE_CLUSTID_filt_rel_wide.txt",
+            file="RAS_F4_GENE_CLUSTID_filt_rel_wide.txt",
             sep="\t")
