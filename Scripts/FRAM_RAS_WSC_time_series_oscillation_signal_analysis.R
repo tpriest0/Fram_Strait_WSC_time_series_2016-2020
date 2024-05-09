@@ -36,7 +36,7 @@ euk_asv_rel=read.table(file="RAS_F4_EUK_ASV_filt_rel.txt", sep="\t",
 
 # Import gene clusters relative abundance data
 mic_clust_rel=read.table(
-  file="FRAM_RAS_F4_GENE_CLUSTID_filt_rel_wide.txt", 
+  file="RAS_F4_GENE_CLUSTID_filt_rel_wide.txt", 
   sep="\t", check.names=F, header=T, row.names=NULL) %>%
   tibble::column_to_rownames(., var="clustID") %>%
   dplyr::select(-row.names)
