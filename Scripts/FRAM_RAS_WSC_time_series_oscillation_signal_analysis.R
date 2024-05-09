@@ -8,8 +8,8 @@
 setwd('XXXXX')
 
 ### Define output directories
-output_figures <- ('')
-output_tables <- ('')
+output_figures <- ('output_figures')
+output_tables <- ('output_tables')
 
 ### Load libraries
 library(stringr)
@@ -192,7 +192,7 @@ plot_asv_gene_mean_osc_per_year <- plot_num_oscillations_py(mean_osc_per_year)
 plot_asv_gene_rel_prop_per_osc <- plot_rel_prop_per_oscillation(asv_gene_rel_prop_per_oscillation)
 
 # Export figure
-pdf(file=paste0(output_figures,"FRAM_RAS_F4_MIC_EUK_ASV_GENE_OSC_per_year_and_rel_abund.pdf"),
+pdf(file=paste0(output_figures,"RAS_F4_MIC_EUK_ASV_GENE_OSC_per_year_and_rel_abund.pdf"),
     height=10, width=8)
 plot_asv_gene_mean_osc_per_year|plot_asv_gene_rel_prop_per_osc
 dev.off()
@@ -228,19 +228,19 @@ mic_gene_clust_osc4_rel_wide =
 
 # Export tables
 write.table(mic_asv_osc4_id_list,
-            file=paste0(output_tables,"FRAM_RAS_F4_MIC_ASVs_OSC4_ID_list.txt"),
+            file="RAS_F4_MIC_ASVs_OSC4_ID_list.txt",
             sep="\t")
 write.table(mic_euk_asv_gene_clust_osc4_id_list,
-            file=paste0(output_tables,"FRAM_RAS_F4_MIC_EUK_ASVs_GENE_CLUST_OSC4_ID_list.txt"),
+            file="RAS_F4_MIC_EUK_ASVs_GENE_CLUST_OSC4_ID_list.txt",
             sep="\t")
 write.table(mic_asv_osc4_rel_wide,
-            file=paste0(output_tables,"FRAM_RAS_F4_MIC_ASV_OSC4_rel_abund_wide.txt"),
+            file="RAS_F4_MIC_ASV_OSC4_rel_abund_wide.txt",
             sep="\t")
 write.table(euk_asv_osc4_rel_wide,
-            file=paste0(output_tables,"FRAM_RAS_F4_EUK_ASV_OSC4_rel_abund_wide.txt"),
+            file="RAS_F4_EUK_ASV_OSC4_rel_abund_wide.txt",
             sep="\t")
 write.table(mic_gene_clust_osc4_rel_wide,
-            file=paste0(output_tables,"FRAM_RAS_F4_MIC_GENE_CLUST_OSC4_rel_abund_wide.txt"),
+            file="RAS_F4_MIC_GENE_CLUST_OSC4_rel_abund_wide.txt",
             sep="\t")
 
 #####
@@ -340,7 +340,7 @@ mic_clust_func_rel_abund_wide =
 # The functional profile will now be subject to fourier transformation and then
 # combined with the prokaryotic ASV oscillations in a network analysis
 write.table(mic_clust_func_rel_abund_wide,
-            file=paste0(output_tables,"FRAM_RAS_F4_MIC_GENE_OSC4_FUNC_rel_abund_wide.txt"),
+            file="RAS_F4_MIC_GENE_OSC4_FUNC_rel_abund_wide.txt",
             sep="\t")
 
 ### What is the average relative abundance of functional gene groups across samples
