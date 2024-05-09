@@ -192,7 +192,7 @@ plot_asv_gene_mean_osc_per_year <- plot_num_oscillations_py(mean_osc_per_year)
 plot_asv_gene_rel_prop_per_osc <- plot_rel_prop_per_oscillation(asv_gene_rel_prop_per_oscillation)
 
 # Export figure
-pdf(file=paste0(output_figures,"RAS_F4_MIC_EUK_ASV_GENE_OSC_per_year_and_rel_abund.pdf"),
+pdf(file=paste0(figures_output,"/FRAM_RAS_F4_MIC_EUK_ASV_GENE_OSC_per_year_and_rel_abund.pdf"),
     height=10, width=8)
 plot_asv_gene_mean_osc_per_year|plot_asv_gene_rel_prop_per_osc
 dev.off()
@@ -227,21 +227,18 @@ mic_gene_clust_osc4_rel_wide =
   filter(row.names(.) %in% mic_euk_asv_gene_clust_osc4_id_list$ID)
 
 # Export tables
-write.table(mic_asv_osc4_id_list,
-            file="RAS_F4_MIC_ASVs_OSC4_ID_list.txt",
-            sep="\t")
 write.table(mic_euk_asv_gene_clust_osc4_id_list,
             file="RAS_F4_MIC_EUK_ASVs_GENE_CLUST_OSC4_ID_list.txt",
-            sep="\t")
+            sep="\t", quote = F, row.names = F)
 write.table(mic_asv_osc4_rel_wide,
             file="RAS_F4_MIC_ASV_OSC4_rel_abund_wide.txt",
-            sep="\t")
+            sep="\t", quote = F, row.names = F)
 write.table(euk_asv_osc4_rel_wide,
             file="RAS_F4_EUK_ASV_OSC4_rel_abund_wide.txt",
-            sep="\t")
+            sep="\t", quote = F, row.names = F)
 write.table(mic_gene_clust_osc4_rel_wide,
             file="RAS_F4_MIC_GENE_CLUST_OSC4_rel_abund_wide.txt",
-            sep="\t")
+            sep="\t", quote = F, row.names = F)
 
 #####
 
@@ -327,26 +324,23 @@ mic_gene_clust_osc4_rel_wide_mod =
 # with a single oscillation per year, then combine with relative abundance matrix and
 # sum the abundances of gene clusters for each function in each sample. This will
 # generate an abundance profile for the functional clusters
-mic_clust_func_rel_abund_wide = 
-  clust_id_func_id_to_func %>%
+mic_clust_func_rel_abund_wide =  
+clust_id_func_id_to_func %>%
   filter(clustID %in% mic_gene_clust_osc4_rel_wide_mod$clustID) %>%
   left_join(mic_gene_clust_osc4_rel_wide_mod, by="clustID") %>%
   reshape2::melt(., id.vars=c("clustID","FUNC","funcID"), variable.name="RAS_id",
                  value.name="Rel_abund") %>%
   aggregate(Rel_abund~funcID+RAS_id, data=., FUN= sum) %>%
-  reshape2::dcast(funcID~RAS_id, value.var="Rel_abund") %>%
-  tibble::column_to_rownames(., var="funcID")
+  reshape2::dcast(funcID~RAS_id, value.var="Rel_abund")
 
 # The functional profile will now be subject to fourier transformation and then
 # combined with the prokaryotic ASV oscillations in a network analysis
 write.table(mic_clust_func_rel_abund_wide,
             file="RAS_F4_MIC_OSC4_FUNC_CLUST_rel_abund_wide.txt",
-            sep="\t")
+            sep="\t", quote = F, row.names = F)
 
 ### What is the average relative abundance of functional gene groups across samples
 mic_clust_func_rel_abund_wide %>%
-  tibble::rownames_to_column(., var="funcID") %>%
   melt(id.vars="funcID", variable.name="RAS_id", value.name="Rel_abund") %>%
   aggregate(Rel_abund~RAS_id, data=., FUN=sum) %>%
   arrange(desc(Rel_abund))
-
