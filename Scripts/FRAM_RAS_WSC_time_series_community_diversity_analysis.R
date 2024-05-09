@@ -6,7 +6,14 @@
 ####################
 
 ### Define working directory
-setwd('') # Set the working directory as the directory where the data_files/ of this repository were downloaded to
+setwd('XXXXX')
+
+### Define output directories
+output_figures <- ('')
+output_tables <- ('')
+
+dir.create(output_figures)
+dir.create(output_tables)
 
 ### Load libraries
 library(ggplot2)
@@ -23,22 +30,22 @@ options(scipen=999)
 
 ### Import files
 # Import eukaryotic filtered ASV raw and rel abund data
-euk_asv_filt_raw=read.table(file="ASV/RAS_F4_EUK_ASV_filt_rare_raw.txt", sep="\t",
+euk_asv_filt_raw=read.table(file="RAS_F4_EUK_ASV_filt_raw.txt", sep="\t",
                             check.names=F, header=T, row.names=1)
 
-euk_asv_filt_rel=read.table(file="ASV/RAS_F4_EUK_ASV_filt_rare_rel.txt", sep="\t",
+euk_asv_filt_rare_raw=read.table(file="RAS_F4_EUK_ASV_filt_rare_raw.txt", sep="\t",
                             check.names=F, header=T, row.names=1) %>%
   mutate(across(is.numeric, ~ .* 100))
 
 # Import microbial filtered ASV raw and rel abund data
-mic_asv_filt_raw=read.table(file="ASV/RAS_F4_MIC_ASV_filt_rare_raw.txt", sep="\t",
+mic_asv_filt_raw=read.table(file="RAS_F4_MIC_ASV_filt_raw.txt", sep="\t",
                             check.names=F, header=T, row.names=1)
 
-mic_asv_filt_rel=read.table(file="ASV/RAS_F4_MIC_ASV_filt_rare_rel.txt", sep="\t",
+mic_asv_filt_rare_raw=read.table(file="RAS_F4_MIC_ASV_filt_rare_raw.txt", sep="\t",
                             check.names=F, header=T, row.names=1)  %>%
   mutate(across(is.numeric, ~ .* 100))
 
-mic_asv_filt_taxa=read.table(file="ASV/RAS_F4_MIC_ASV_filt_taxa.txt", sep="\t",
+mic_asv_filt_taxa=read.table(file="RAS_F4_MIC_ASV_filt_taxa.txt", sep="\t",
                             check.names=F, header=T, row.names=1)  %>%
   mutate(across(is.numeric, ~ .* 100))
 
@@ -66,25 +73,70 @@ mic_asv_filt_taxa %>%
 #####
 
 ### Calculate alpha diversity metrics
-calculate_alpha_div <- function(abund_table, sample_meta){
-  R = specnumber(t(abund_table))
-  H = diversity(t(abund_table), "shannon")
-  E = H/log(R)
+
+# For this, we will use the raw count table and perform 100 iterations of rarefying + 
+# alpha diversity calculation. Then we will calculate a mean and standard deviation.
+
+mic_smallest_count <- min(colSums(mic_asv_filt_raw))
+euk_smallest_count <- min(colSums(euk_asv_filt_raw))
+
+calculate_alpha_div <- function(abund_table, rarefy_number, sample_meta){
   
-  alpha_div_df = 
-    data.frame(cbind(Richness = R, Shannon_diversity = H, Evenness = E)) %>%
-    tibble::rownames_to_column(., var = "RAS_id") %>%
-    left_join(sample_meta, by = "RAS_id") %>%
-    mutate(month = factor(month, levels = c("Jan","Feb","Mar","Apr",
-                                        "May","Jun","Jul","Aug",
-                                        "Sep","Oct","Nov","Dec")))
-  return(alpha_div_df)
+  results_list <- list()
+  
+  for (i in 1:100) {
+    rarefied_abund <- t(rrarefy(t(abund_table), rarefy_number))
+    
+    R <- specnumber(t(rarefied_abund))
+    H <- diversity(t(rarefied_abund), "shannon")
+    E <- H/log(R)
+    
+    alpha_div_df <- data.frame(RAS_id = colnames(abund_table), 
+                               Richness = R, 
+                               Shannon_diversity = H, 
+                               Evenness = E)
+    
+    results_list[[i]] <- alpha_div_df
+  }
+  
+  combined_results <- bind_rows(results_list)
+  
+  summary_stats <- combined_results %>%
+    group_by(RAS_id) %>%
+    summarise(
+      Mean_Richness = mean(Richness),
+      SD_Richness = sd(Richness),
+      Mean_Shannon_diversity = mean(Shannon_diversity),
+      SD_Shannon_diversity = sd(Shannon_diversity),
+      Mean_Evenness = mean(Evenness),
+      SD_Evenness = sd(Evenness)
+    )
+  
+  return(summary_stats)
 }
 
-mic_alpha_with_meta = calculate_alpha_div(mic_asv_filt_raw, sample_meta)
-euk_alpha_with_meta = calculate_alpha_div(euk_asv_filt_raw, sample_meta)
+# Run above function and the combine the output dataframe with metadata ready for plotting
+mic_alpha_div_results = calculate_alpha_div(mic_asv_filt_raw, mic_smallest_count, sample_meta) %>%
+  as.data.frame()
 
-### FUNCTION: Visualise diversity over time-series
+mic_alpha_div_df = 
+  as.data.frame(mic_alpha_div_results) %>%
+  left_join(sample_meta, by = "RAS_id") %>%
+  mutate(month = factor(month, levels = c("Jan","Feb","Mar","Apr",
+                                          "May","Jun","Jul","Aug",
+                                          "Sep","Oct","Nov","Dec")))
+  
+euk_alpha_div_results = calculate_alpha_div(euk_asv_filt_raw, euk_smallest_count, sample_meta) %>%
+  as.data.frame()
+
+euk_alpha_div_df = 
+  euk_alpha_div_results %>%
+  left_join(sample_meta, by = "RAS_id") %>%
+  mutate(month = factor(month, levels = c("Jan","Feb","Mar","Apr",
+                                          "May","Jun","Jul","Aug",
+                                          "Sep","Oct","Nov","Dec")))
+
+### FUNCTION: Visualise mean values of alpha diversity over time-series
 plot_diversity_metrics <- function(infile,metric,yaxislabel){
   infile %>%
     select(date,{{metric}}) %>%
@@ -108,13 +160,22 @@ remove_x_axis <- theme(
   axis.title.x = element_blank()
 )
 
-euk_richness = plot_diversity_metrics(euk_alpha_with_meta, Richness, "Richness")
-euk_shannon = plot_diversity_metrics(euk_alpha_with_meta, Shannon_diversity, "Shannon diversity")
-euk_evenness = plot_diversity_metrics(euk_alpha_with_meta, Evenness, "Evenness")
+euk_richness = plot_diversity_metrics(euk_alpha_div_df, Mean_Richness, "Mean richness")
+euk_shannon = plot_diversity_metrics(euk_alpha_div_df, Mean_Shannon_diversity, "Mean shannon diversity")
+euk_evenness = plot_diversity_metrics(euk_alpha_div_df, Mean_Evenness, "Mean evenness")
 
-mic_richness = plot_diversity_metrics(mic_alpha_with_meta, Richness, "Richness")
-mic_shannon = plot_diversity_metrics(mic_alpha_with_meta, Shannon_diversity, "Shannon diversity")
-mic_evenness = plot_diversity_metrics(mic_alpha_with_meta, Evenness, "Evenness")
+mic_richness = plot_diversity_metrics(mic_alpha_div_df, Mean_Richness, "Mean richness")
+mic_shannon = plot_diversity_metrics(mic_alpha_div_df, Mean_Shannon_diversity, "Mean shannon diversity")
+mic_evenness = plot_diversity_metrics(mic_alpha_div_df, Mean_Evenness, "Mean evenness")
+
+### Export alpha diversity tables
+write.table(mic_alpha_div_results,
+            file = paste0(output_tables,"FRAM_RAS_F4_MIC_alpha_diversity_metrics.txt"), 
+            sep = "\t")
+
+write.table(euk_alpha_div_results,
+            file = paste0(output_tables,"FRAM_RAS_F4_EUK_alpha_diversity_metrics.txt"), 
+            sep = "\t")
 
 #####
 
@@ -132,7 +193,7 @@ sample_meta_stand =
 ### FUNCTION: Calculate pearson's correlation between diversity metrics and env variables
 diversity_vs_env_correlation <- function(infile, sample_meta_stand){
   infile %>%
-    select(RAS_id,Richness,Shannon_diversity,Evenness) %>%
+    select(RAS_id,Mean_Richness,Mean_Shannon_diversity,Mean_Evenness) %>%
     left_join(sample_meta_stand, by = "RAS_id") %>% 
     tibble::column_to_rownames(., var="RAS_id") %>%
     as.matrix() %>%
@@ -157,18 +218,18 @@ correct_and_filter_cor_results <- function(cor_df){
   cor_df %>%
     mutate(p_adj = adjusted_p) %>% 
     filter(p_adj < 0.05) %>%
-    filter(row == "Shannon_diversity" |
-             row == "Evenness" | 
-             row == "Richness")
+    filter(row == "Mean_Shannon_diversity" |
+             row == "Mean_Evenness" | 
+             row == "Mean_Richness")
 }
 
 # Run above functions to create a dataframe containing correlation coefficients
 # associated with adjusted p-values < 0.05
-mic_alpha_vs_env_cor_results = diversity_vs_env_correlation(mic_alpha_with_meta, sample_meta_stand)
+mic_alpha_vs_env_cor_results = diversity_vs_env_correlation(mic_alpha_div_df, sample_meta_stand)
 mic_alpha_vs_env_cor_df = process_correlation_matrix(mic_alpha_vs_env_cor_results$r,mic_alpha_vs_env_cor_results$P)
 mic_alpha_vs_env_cor_sig_df = correct_and_filter_cor_results(mic_alpha_vs_env_cor_df)
 
-euk_alpha_vs_env_cor_results = diversity_vs_env_correlation(euk_alpha_with_meta, sample_meta_stand)
+euk_alpha_vs_env_cor_results = diversity_vs_env_correlation(euk_alpha_div_df, sample_meta_stand)
 euk_alpha_vs_env_cor_df = process_correlation_matrix(euk_alpha_vs_env_cor_results$r,euk_alpha_vs_env_cor_results$P)
 euk_alpha_vs_env_cor_sig_df = correct_and_filter_cor_results(euk_alpha_vs_env_cor_df)
 
@@ -219,13 +280,14 @@ for (i in 1:nrow(euk_alpha_vs_env_cor_sig_df)) {
 euk_alpha_vs_env_cor_sig_df$ci_lower <- ci_lower
 euk_alpha_vs_env_cor_sig_df$ci_upper <- ci_upper
 
+
 ### Export the dataframes containing information on significant correlation results
 write.table(mic_alpha_vs_env_cor_sig_df,
-            file = "figures_output/FRAM_RAS_F4_MIC_div_vs_env_correlation_df.txt", 
+            file = paste0(output_tables,"FRAM_RAS_F4_MIC_div_vs_env_correlation_df.txt"), 
             sep = "\t")
 
 write.table(euk_alpha_vs_env_cor_sig_df,
-            file = "figures_output/FRAM_RAS_F4_EUK_div_vs_env_correlation_df.txt", 
+            file = paste0(output_tables,"FRAM_RAS_F4_EUK_div_vs_env_correlation_df.txt"), 
             sep = "\t")
 
 ###
@@ -257,8 +319,8 @@ mic_div_vs_env_sig_cor_plot = plot_sig_cor_hits(mic_alpha_vs_env_cor_sig_df)
 
 ### Combine plots and export
 library(patchwork)
-pdf(file="figures_output/RAS_F4_MIC_EUK_ASV_diversity_and_correlations.pdf",
-    height=10, width = 14)
+pdf(file=paste0(output_figures,"RAS_F4_MIC_EUK_ASV_diversity_and_correlations.pdf"),
+    height=10, width = 16)
 ((mic_richness+remove_x_axis)/(mic_evenness+remove_x_axis)/mic_shannon/mic_div_vs_env_sig_cor_plot)|
   ((euk_richness+remove_x_axis)/(euk_evenness+remove_x_axis)/euk_shannon/euk_div_vs_env_sig_cor_plot)
 dev.off()
@@ -268,12 +330,12 @@ dev.off()
 ##### Beta-diversity analysis
 
 ### Hellinger transform counts and calculate bray-curtis dissimilarity
-mic_asv_hel_bray = mic_asv_filt_raw %>%
+mic_asv_hel_bray = mic_asv_filt_rare_raw %>%
   decostand(., method="hellinger", MARGIN=2) %>%
   t() %>%
   vegdist(., method="bray")
 
-euk_asv_hel_bray = euk_asv_filt_raw %>%
+euk_asv_hel_bray = euk_asv_filt_rare_raw %>%
   decostand(., method="hellinger", MARGIN=2) %>%
   t() %>%
   vegdist(., method="bray")
@@ -347,7 +409,7 @@ euk_asv_bray_nmds_plot_with_hulls =
         axis.title.y = element_text(size =12))
 
 ### combine plots and export
-pdf(file="figures_output/FRAM_RAS_F4_MIC_and_EUK_NMDS_plots.pdf",
+pdf(file=paste0(output_figures,"FRAM_RAS_F4_MIC_and_EUK_NMDS_plots.pdf"),
     height=12, width = 8)
 mic_asv_bray_nmds_plot_with_hulls/euk_asv_bray_nmds_plot_with_hulls
 dev.off()
@@ -385,4 +447,4 @@ mic_and_euk_convex_hull_areas <- data.frame(month = months, microeukaryotic_hull
 
 # Export
 write.table(mic_and_euk_convex_hull_areas, 
-            file = "figures_output/FRAM_RAS_F4_MIC_EUK_NMDS_convex_hull_areas.txt",sep="\t")
+            file = paste0(output_figures,"FRAM_RAS_F4_MIC_EUK_NMDS_convex_hull_areas.txt"),sep="\t")
