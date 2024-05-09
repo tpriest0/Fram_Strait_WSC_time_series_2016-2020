@@ -114,21 +114,21 @@ euk_asv_filt_rel_mod = subset(euk_asv_filt_rel, select=-c(`02_2018_F4_2`))
 ### Export all tables
 ## Export tables
 write.table(mic_asv_filt_raw_wide,
-            file="ASV/RAS_F4_MIC_ASV_filt_raw.txt", sep="\t")
+            file="ARAS_F4_MIC_ASV_filt_raw.txt", sep="\t")
 write.table(mic_asv_filt_rel,
-            file="ASV/RAS_F4_MIC_ASV_filt_rel.txt", sep="\t")
+            file="RAS_F4_MIC_ASV_filt_rel.txt", sep="\t")
 write.table(euk_asv_filt_raw_mod,
-            file="ASV/RAS_F4_EUK_ASV_filt_raw.txt", sep="\t")
+            file="RAS_F4_EUK_ASV_filt_raw.txt", sep="\t")
 write.table(euk_asv_filt_rel_mod,
-            file="ASV/RAS_F4_EUK_ASV_filt_rel.txt", sep="\t") 
+            file="RAS_F4_EUK_ASV_filt_rel.txt", sep="\t") 
 write.table(mic_asv_filt_rarefied,
-            file="ASV/RAS_F4_MIC_ASV_filt_rare_raw.txt", sep="\t")
+            file="RAS_F4_MIC_ASV_filt_rare_raw.txt", sep="\t")
 write.table(euk_asv_filt_rarefied,
-            file="ASV/RAS_F4_EUK_ASV_filt_rare_raw.txt", sep="\t")
+            file="RAS_F4_EUK_ASV_filt_rare_raw.txt", sep="\t")
 write.table(mic_asv_filt_rarefied_rel,
-            file="ASV/RAS_F4_MIC_ASV_filt_rare_rel.txt", sep="\t")
+            file="RAS_F4_MIC_ASV_filt_rare_rel.txt", sep="\t")
 write.table(euk_asv_filt_rarefied_rel,
-            file="ASV/RAS_F4_EUK_ASV_filt_rare_rel.txt", sep="\t")
+            file="RAS_F4_EUK_ASV_filt_rare_rel.txt", sep="\t")
 
 ### Filter taxa tables to include only those ASVs that passed filtering 
 mic_asv_taxa_filt = 
