@@ -5,7 +5,9 @@
 ####################
 
 ### Define working directory
-setwd('C:/Users/tpriest/OneDrive - ETH Zurich/MPI - FRAM/WSC')
+setwd('XXXXX')
+
+
 
 ### Load libraries
 library(dplyr)
