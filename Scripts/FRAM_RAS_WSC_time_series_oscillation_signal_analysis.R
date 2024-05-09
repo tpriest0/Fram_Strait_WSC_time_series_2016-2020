@@ -5,7 +5,11 @@
 ####################
 
 ### Define working directory
-setwd('C:/Users/tpriest/OneDrive - ETH Zurich/MPI - FRAM/WSC')
+setwd('XXXXX')
+
+### Define output directories
+output_figures <- ('')
+output_tables <- ('')
 
 ### Load libraries
 library(stringr)
@@ -17,35 +21,35 @@ library(tibble)
 options(scipen=999)
 
 # Import microbial ASV oscillation signal patterns
-mic_asv_oscillation_py=read.table(file="time_series_analysis/RAS_F4_MIC_ASV_num_osc_per_year.csv", 
+mic_asv_oscillation_py=read.table(file="RAS_F4_MIC_ASV_num_osc_per_year.csv", 
                                   sep=",", check.names=F, header=T) %>%
   mutate(type = "MIC_ASV") %>%
   dplyr::rename(., ID = asv)
 
 # Import gene clusters (95% ANI clusters) oscillation signal patterns
-mic_clust_oscillation_py=read.table(file="time_series_analysis/FRAM_RAS_F4_MIC_GENE_CLUST_num_osc_per_year.csv", 
+mic_clust_oscillation_py=read.table(file="FRAM_RAS_F4_MIC_GENE_CLUST_num_osc_per_year.csv", 
                                    sep=",", check.names=F, row.names=NULL, header=T) %>%
   dplyr::select(asv,year,oscillations) %>%
   mutate(type = "MIC_GENE_CLUSTERS") %>%
   dplyr::rename(., ID = asv)
 
 # Import eukaryotic ASV oscillation signal patterns
-euk_asv_oscillation_py=read.table(file="time_series_analysis/RAS_F4_EUK_ASV_num_osc_per_year.csv", 
+euk_asv_oscillation_py=read.table(file="RAS_F4_EUK_ASV_num_osc_per_year.csv", 
                                   sep=",", check.names=F, header=T) %>%
   mutate(type = "EUK_ASV") %>%
   dplyr::rename(., ID = asv)
 
 # Import microbial ASV relative abundance data
-mic_asv_rel=read.table(file="ASV/RAS_F4_MIC_ASV_filt_rare_rel.txt", sep="\t",
+mic_asv_rel=read.table(file="RAS_F4_MIC_ASV_filt_rare_rel.txt", sep="\t",
                        check.names=F, header=T, row.names=1)
 
 # Import EUK ASV relative abundance data
-euk_asv_rel=read.table(file="ASV/RAS_F4_EUK_ASV_filt_rare_rel.txt", sep="\t",
+euk_asv_rel=read.table(file="RAS_F4_EUK_ASV_filt_rare_rel.txt", sep="\t",
                        check.names=F, header=T, row.names=1)
 
 # Import gene clusters relative abundance data
 mic_clust_rel=read.table(
-  file="metagenomes/community_gene_profiles/FRAM_RAS_F4_GENE_CLUSTID_filt_rel_wide.txt", 
+  file="FRAM_RAS_F4_GENE_CLUSTID_filt_rel_wide.txt", 
   sep="\t", check.names=F, header=T, row.names=NULL) %>%
   tibble::column_to_rownames(., var="clustID") %>%
   dplyr::select(-row.names)
