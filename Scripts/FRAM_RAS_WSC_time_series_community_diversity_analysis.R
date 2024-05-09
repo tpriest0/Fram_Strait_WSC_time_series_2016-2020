@@ -12,8 +12,8 @@ setwd('XXXXX')
 output_figures <- ('')
 output_tables <- ('')
 
-dir.create(output_figures)
 dir.create(output_tables)
+dir.create(output_figures)
 
 ### Load libraries
 library(ggplot2)
@@ -170,11 +170,11 @@ mic_evenness = plot_diversity_metrics(mic_alpha_div_df, Mean_Evenness, "Mean eve
 
 ### Export alpha diversity tables
 write.table(mic_alpha_div_results,
-            file = paste0(output_tables,"FRAM_RAS_F4_MIC_alpha_diversity_metrics.txt"), 
+            file = paste0(output_tables,"RAS_F4_MIC_alpha_diversity_metrics.txt"), 
             sep = "\t")
 
 write.table(euk_alpha_div_results,
-            file = paste0(output_tables,"FRAM_RAS_F4_EUK_alpha_diversity_metrics.txt"), 
+            file = paste0(output_tables,"RAS_F4_EUK_alpha_diversity_metrics.txt"), 
             sep = "\t")
 
 #####
@@ -283,11 +283,11 @@ euk_alpha_vs_env_cor_sig_df$ci_upper <- ci_upper
 
 ### Export the dataframes containing information on significant correlation results
 write.table(mic_alpha_vs_env_cor_sig_df,
-            file = paste0(output_tables,"FRAM_RAS_F4_MIC_div_vs_env_correlation_df.txt"), 
+            file = paste0(output_tables,"RAS_F4_MIC_div_vs_env_correlation_df.txt"), 
             sep = "\t")
 
 write.table(euk_alpha_vs_env_cor_sig_df,
-            file = paste0(output_tables,"FRAM_RAS_F4_EUK_div_vs_env_correlation_df.txt"), 
+            file = paste0(output_tables,"RAS_F4_EUK_div_vs_env_correlation_df.txt"), 
             sep = "\t")
 
 ###
@@ -409,7 +409,7 @@ euk_asv_bray_nmds_plot_with_hulls =
         axis.title.y = element_text(size =12))
 
 ### combine plots and export
-pdf(file=paste0(output_figures,"FRAM_RAS_F4_MIC_and_EUK_NMDS_plots.pdf"),
+pdf(file=paste0(output_figures,"RAS_F4_MIC_and_EUK_NMDS_plots.pdf"),
     height=12, width = 8)
 mic_asv_bray_nmds_plot_with_hulls/euk_asv_bray_nmds_plot_with_hulls
 dev.off()
@@ -447,4 +447,4 @@ mic_and_euk_convex_hull_areas <- data.frame(month = months, microeukaryotic_hull
 
 # Export
 write.table(mic_and_euk_convex_hull_areas, 
-            file = paste0(output_figures,"FRAM_RAS_F4_MIC_EUK_NMDS_convex_hull_areas.txt"),sep="\t")
+            file = paste0(output_figures,"RAS_F4_MIC_EUK_NMDS_convex_hull_areas.txt"),sep="\t")
