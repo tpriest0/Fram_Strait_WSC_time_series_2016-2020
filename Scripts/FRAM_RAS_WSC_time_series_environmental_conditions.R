@@ -7,20 +7,14 @@
 ### Define working directory
 setwd('XXXXX')
 
-
+### Define output directories
+output_figures <- ('')
+output_tables <- ('')
 
 ### Load libraries
 library(dplyr)
 library(ggplot2)
 library(patchwork)
-library(tibble)
-library(vegan)
-library(stats)
-library(Hmisc)
-library(RcmdrMisc)
-library(reshape2)
-library(purrr)
-library(tidyr)
 
 ### Import files
 # Import metdata
@@ -86,41 +80,11 @@ time_series_oxygen_plot <- plot_env_variables(ras_metadata, O2_sat, "#006ddb",
 
 
 ### Combine all plots together into Figure and export
-pdf(file="figures_output/FRAM_RAS_F4_env_conditions_and_sampling_timepoints.pdf",height=8, width=10)
+pdf(file=paste0(output_figures,"FRAM_RAS_F4_env_conditions_and_sampling_timepoints.pdf"),height=8, width=10)
 time_series_temp_plot/time_series_oxygen_plot/time_series_MLD_plot/
   time_series_chla_plot/time_series_PAR_plot/
   ras_wsc_asv_and_mg_sampling_timepoints_plot+
   plot_layout(nrow=6,heights=c(3,3,3,3,3,0.5))
 dev.off()
 
-### Run correlation analysis between env variables
-head(ras_metadata)
-View(ras_metadata)
-ras_meta_select_stand = ras_metadata %>%
-  select(RAS_id,depth,temp,sal,O2_conc,Chl_a,PAR_satellite,MLD) %>%
-  tibble::column_to_rownames(., var="RAS_id") %>%
-  decostand(., method="standardize", MARGIN=2) %>%
-  as.data.frame(.)
-  
-ras_meta_select_stand_corr = rcorr(as.matrix(ras_meta_select_stand))
-ras_meta_select_stand_corr = rcorr.adjust(as.matrix(ras_meta_select_stand), type = "pearson")
-
-ras_meta_select_stand_corr_sig_p = as.data.frame(ras_meta_select_stand_corr$P) %>%
-  tibble::rownames_to_column(., var="var_one") %>%
-  reshape2::melt(id.vars="var_one", variable.name="var_two", value.name="p_val") %>%
-  filter(., p_val < 0.05 & p_val > 0)
-ras_meta_select_stand_corr$R$r
-ras_meta_select_stand_corr_coeff = as.data.frame(ras_meta_select_stand_corr$R$r) %>%
-  tibble::rownames_to_column(., var="var_one") %>%
-  reshape2::melt(id.vars="var_one", variable.name="var_two", value.name="coefficient")
-
-ras_meta_select_stand_corr_sig_p %>%
-  left_join(ras_meta_select_stand_corr_coeff, by=c("var_one", "var_two"))
-
-
-### Can alternatively run all vs all pairwise linear regressions
-out <- crossing(y = colnames(ras_meta_select_stand), x = colnames(ras_meta_select_stand)) %>%
-  mutate(mod = map2(x, y,
-                    ~ summary(lm(reformulate(.x, response = .y), data = ras_meta_select_stand))))
-out$mod
 
