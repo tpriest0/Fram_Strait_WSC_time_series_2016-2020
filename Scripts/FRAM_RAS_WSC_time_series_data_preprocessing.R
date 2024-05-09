@@ -6,7 +6,7 @@
 
 
 # Define working directory
-setwd('C:/Users/tpriest/OneDrive - ETH Zurich/MPI - FRAM/WSC')
+setwd('XXXXX')
 
 # Load libaries
 library(dplyr)
@@ -18,19 +18,19 @@ library(tibble)
 ### Import data
 
 # Import microbial ASV count data
-mic_asv_raw=read.table(file="ASV/RAS_F4_MIC_ASV_raw_counts.txt", sep="\t",
+mic_asv_raw=read.table(file="RAS_F4_MIC_ASV_raw_counts.txt", sep="\t",
                        check.names=F, header=T)
 
 # Import microbial ASV taxa information
-mic_asv_taxa=read.table(file="ASV/RAS_F4_MIC_ASV_taxa.txt", sep="\t",
+mic_asv_taxa=read.table(file="RAS_F4_MIC_ASV_taxa.txt", sep="\t",
                        check.names=F, header=T)
 
 # Import eukaryotic ASV count data
-euk_asv_raw=read.table(file="ASV/RAS_F4_EUK_ASV_raw_counts.txt", sep="\t",
+euk_asv_raw=read.table(file="RAS_F4_EUK_ASV_raw_counts.txt", sep="\t",
                             check.names=F, header=T)
 
 # Import eukaryotic ASV taxa information
-euk_asv_taxa=read.table(file="ASV/RAS_F4_EUK_ASV_taxa.txt", sep="\t",
+euk_asv_taxa=read.table(file="RAS_F4_EUK_ASV_taxa.txt", sep="\t",
                         check.names=F, header=T)
 
 ### Identify ASVs with less than 3 counts in less than 3 samples and remove them
@@ -61,6 +61,17 @@ euk_asv_filt_raw_wide = euk_asv_raw %>%
   filter(ASV_name %in% euk_asv_filt_names$ASV_name) %>%
   tibble::column_to_rownames(., var = "ASV_name")
 
+# Calculate relative abundace from raw counts of filtered ASVs
+mic_asv_filt_rel = 
+  as.data.frame(mic_asv_filt_raw_wide) %>%
+  decostand(., method="total", MARGIN=2) %>%
+  tibble::rownames_to_column(., var="ASV_name")
+
+euk_asv_filt_rel = 
+  as.data.frame(euk_asv_filt_raw_wide) %>%
+  decostand(., method="total", MARGIN=2) %>%
+  tibble::rownames_to_column(., var="ASV_name")
+
 ### Rarefy data
 
 ## Prokaryotic
@@ -84,12 +95,6 @@ euk_smallest_count <- min(colSums(euk_asv_filt_raw_mod))
 
 euk_asv_filt_rarefied = t(rrarefy(t(euk_asv_filt_raw_mod), euk_smallest_count))
 
-### Export rarefied count tables
-write.table(mic_asv_filt_rarefied,
-            file="ASV/RAS_F4_MIC_ASV_filt_rare_raw.txt", sep="\t")
-write.table(euk_asv_filt_rarefied,
-            file="ASV/RAS_F4_EUK_ASV_filt_rare_raw.txt", sep="\t")
-
 ### Create relative abundance tables
 mic_asv_filt_rarefied_rel = 
   as.data.frame(mic_asv_filt_rarefied) %>%
@@ -101,7 +106,25 @@ euk_asv_filt_rarefied_rel =
   decostand(., method="total", MARGIN=2) %>%
   tibble::rownames_to_column(., var="ASV_name")
 
-# Export tables 
+### Based on the low counts observed in 02_2018_F4_2, also remove this 
+### from the filtered relative abundance table as it will not be included
+### in further analysis
+euk_asv_filt_rel_mod = subset(euk_asv_filt_rel, select=-c(`02_2018_F4_2`))
+
+### Export all tables
+## Export tables
+write.table(mic_asv_filt_raw_wide,
+            file="ASV/RAS_F4_MIC_ASV_filt_raw.txt", sep="\t")
+write.table(mic_asv_filt_rel,
+            file="ASV/RAS_F4_MIC_ASV_filt_rel.txt", sep="\t")
+write.table(euk_asv_filt_raw_mod,
+            file="ASV/RAS_F4_EUK_ASV_filt_raw.txt", sep="\t")
+write.table(euk_asv_filt_rel_mod,
+            file="ASV/RAS_F4_EUK_ASV_filt_rel.txt", sep="\t") 
+write.table(mic_asv_filt_rarefied,
+            file="ASV/RAS_F4_MIC_ASV_filt_rare_raw.txt", sep="\t")
+write.table(euk_asv_filt_rarefied,
+            file="ASV/RAS_F4_EUK_ASV_filt_rare_raw.txt", sep="\t")
 write.table(mic_asv_filt_rarefied_rel,
             file="ASV/RAS_F4_MIC_ASV_filt_rare_rel.txt", sep="\t")
 write.table(euk_asv_filt_rarefied_rel,
@@ -184,78 +207,3 @@ write.table(ras_mg_geneclust_profile_norm_wide,
 write.table(ras_mg_geneclust_profile_rel_prop_wide,
             file="metagenomes/community_gene_profiles/FRAM_RAS_F4_GENE_CLUSTID_filt_rel_wide.txt",
             sep="\t")
-
-######
-
-### What proportion of community gene content was captured by EGGNOG orthologous
-### groups?
-ras_mg_func_profile_rel_prop_wide %>%
-  reshape2::melt(id.vars="geneID", variable.name="RAS_id", value.name="Rel_abund") %>%
-  filter(geneID == "Unassigned") %>%
-  arrange(desc(Rel_abund)) %>%
-  mutate(prop = 1.00 - Rel_abund) %>%
-  summarise(mean = mean(prop))
-
-
-###
-
-### What was the composition of the metagenomes at kingdom level? i.e. what 
-### proportion of reads was bacteria, archaea or eukarya? Read assignments were
-### performed using tiara
-
-# Import metdata
-mg_read_taxonomy=read.table(file="metagenomes/FRAM_RAS_F4_read_tiara_assignments.txt", 
-                        sep="\t",check.names=F, header=T)
-
-# Import metadata and create sample name to date mapping file
-ras_metadata=read.table(file="RAS_F4_META.txt", sep="\t",
-                        check.names=F, header=T) %>%
-  select(RAS_id,date) %>%
-  mutate(date = as.Date(date, "%d.%m.%Y"))
-
-# Reformat names to RAS_id and calculate relative proportions
-mg_read_taxonomy_rel_prop_wide = mg_read_taxonomy %>%
-  select(RAS_id,Assignment) %>%
-  table() %>%
-  as.data.frame() %>%
-  reshape2::dcast(RAS_id~Assignment, value.var="Freq", data=.) %>%
-  tibble::column_to_rownames(., var="RAS_id") %>%
-  decostand(., method="total", MARGIN=1)
-
-# Reform relative proportion table to long format and join with metadata for plotting
-mg_read_taxonomy_rel_prop_long_w_date = 
-  mg_read_taxonomy_rel_prop_wide %>%
-  tibble::rownames_to_column(., var="RAS_id") %>%
-  reshape2::melt(variable.name = "Taxonomy", value.name = "Rel_prop", data=.) %>%
-  left_join(ras_metadata, by="RAS_id") %>%
-  mutate(Taxonomy = factor(Taxonomy, levels = c("archaea","bacteria",
-                                                "prokarya","organelle",
-                                                "eukarya","unknown")))
-
-# Visualise in stacked bar plot
-taxonomy_colours = c("archaea" = "#000000",
-                     "bacteria" = "#009292",
-                     "eukarya" = "#ffb6db",
-                     "organelle" = "#db6d00",
-                     "prokarya" = "#006ddb",
-                     "unknown" = "gray90")
-
-mg_read_comp_stacked_bar = ggplot(mg_read_taxonomy_rel_prop_long_w_date,
-       aes(x = as.Date(date), y = Rel_prop)) +
-  geom_bar(aes(fill = Taxonomy), position="stack", stat="identity") + 
-  scale_x_date(date_breaks = "6 months", date_labels =  "%b %Y") +
-  scale_fill_manual(values = taxonomy_colours) +
-  labs(y = "Relative proportion (%)") + 
-  theme_bw() + 
-  theme(axis.title.y = element_text(size = 12),
-        axis.text.y = element_text(size = 10),
-        axis.text.x = element_text(size = 10, angle = 45, hjust = 1),
-        axis.title.x = element_blank(),
-        legend.text = element_text(size = 12),
-        legend.title = element_text(size = 12))
-
-# Export figure
-pdf("figures_output/FRAM_RAS_MG_read_composition_kingdom_stacked_bar.pdf",
-    height=6, width=8)
-mg_read_comp_stacked_bar
-dev.off()
