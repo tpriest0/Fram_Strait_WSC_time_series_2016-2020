@@ -6,8 +6,8 @@ The repository aims to support the following manuscript:
 
 For a background on the dataset, please refer to the methodology section of the manuscript.
 
-1) [Metagenomic long-read taxonomic and functional profiling](https://github.com/tpriest0/FRAM_STRAIT_WSC20_data_analysis/wiki/Functional-profiling-of-metagenomic-long-reads-and-MAGs-and-taxonomic-classification-of-reads) : detailed description along with code used to functionally and taxonomically annotate metagenomic HiFi reads.
+1) [Constructing gene and functional cluster catalogues](https://github.com/tpriest0/Fram_Strait_WSC_time_series_2016-2020/wiki/Construction-of-gene-and-functional-cluster-catalogues-and-their-taxonomic-classification) : detailed description along with code used to build gene and functional clusters from PacBio HiFi read metagenomes.
 
 2) [Ribosomal protein analysis to assess community diversity and complexity](https://github.com/tpriest0/FRAM_STRAIT_WSC20_data_analysis/wiki/Community-level-ribosomal-protein-gene-analysis)
 
-5) [Analysis of 16S and 18S rRNA gene amplicon data and creation of figures presented in manuscript](https://github.com/tpriest0/FRAM_STRAIT_WSC20_data_analysis/wiki/Statistical-analysis-and-figure-creation)
+3) [Analysis of 16S and 18S rRNA gene amplicon data and creation of figures presented in manuscript](https://github.com/tpriest0/FRAM_STRAIT_WSC20_data_analysis/wiki/Statistical-analysis-and-figure-creation)
