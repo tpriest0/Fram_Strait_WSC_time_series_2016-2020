@@ -7,7 +7,12 @@
 ####################
 
 ### Define working directory
-setwd('C:/Users/tpriest/OneDrive - ETH Zurich/MPI - FRAM/WSC')
+setwd('XXXXX')
+
+output_tables <- ('output_tables')
+output_figures <- ('output_figures')
+dir.create(output_tables)
+dir.create(output_figures)
 
 ### Load libraries
 library(dplyr)
@@ -21,27 +26,28 @@ library(tidyverse)
 library(stringr)
 library(vegan)
 library(tibble)
+library(Hmisc)
 
 ### Import data
-# Import MIC_ASV relative abundance data
-mic_asv_rel=read.table(file="ASV/RAS_F4_MIC_ASV_filt_rare_rel.txt", sep="\t",
+# Import prokaryotic ASV relative abundance data
+mic_asv_rel=read.table(file="RAS_F4_MIC_ASV_filt_rel.txt", sep="\t",
                        check.names=F, header=T, row.names=1) %>%
   tibble::rownames_to_column(., var="nodeId")
 
 # Import ASV and gene network cluster assignments
-mic_net_mod_node_assignments=
-  read.table(file="Network_analysis/FRAM_RAS_F4_NET_MOD_assignments.txt",
+net_mod_components=
+  read.table(file="RAS_F4_NET_MOD_assignments.txt",
                     sep="\t", check.names=F, header=T)
 
 
 # Import gene cluster ID to function to function ID
 clust_id_func_id_to_func=read.csv(
-  file="metagenomes/community_gene_profiles/FRAM_RAS_F4_GENES_CLUSTID_to_FUNCID_to_FUNC.txt",
+  file="RAS_F4_GENES_CLUSTID_to_FUNCID_to_FUNC.txt",
   sep="\t",check.names=F, header=T)
 
 # Import function abundance profile
 mic_func_rel_wide = 
-  read.table(file="time_series_analysis/FRAM_RAS_F4_MIC_GENE_OSC4_FUNC_rel_abund_wide.txt",sep="\t",
+  read.table(file="RAS_F4_MIC_OSC4_FUNC_CLUST_rel_abund_wide.txt",sep="\t",
              check.names=F) %>%
   tibble::rownames_to_column(., var="funcID")
 
@@ -54,15 +60,10 @@ sample_meta =
 ### Firstly, combine funcID to network module with information on gene clusters to funcID
 clust_to_func_to_net_mod = 
   clust_id_func_id_to_func %>%
-  left_join(mic_net_mod_node_assignments, by=c("funcID" = "nodeId","Module","type"))
+  left_join(net_mod_components, by=c("funcID" = "nodeId"))
 
 write.table(clust_to_func_to_net_mod,
-            file = "Network_analysis/FRAM_RAS_F4_NET_MOD_func_and_geneclust.txt",
-            sep="\t", row.names=F)
-
-### Output modified network module to node id table
-write.table(mic_net_mod_node_assignments,
-            file = "Network_analysis/FRAM_RAS_F4_NET_MOD_to_nodes.txt",
+            file = "RAS_F4_GENES_CLUSTID_to_FUNCID_to_FUNC_to_MOD.txt",
             sep="\t", row.names=F)
 
 #####
@@ -71,6 +72,11 @@ write.table(mic_net_mod_node_assignments,
 
 ### Visualise the number of functional and taxonomic components in each 
 ### module
+net_mod_components %>%
+  select(Module,type) %>%
+  table() %>%
+  as.data.frame()
+
 net_mod_component_counts_barplot = 
   net_mod_components %>%
   select(Module,type) %>%
@@ -81,8 +87,8 @@ net_mod_component_counts_barplot =
   facet_grid(.~Module, scales = "free_x") + 
   scale_y_log10() + 
   labs(y = "Number of components") +
-  scale_fill_manual(values = c("prok" = "#616569",
-                               "func" = "#C5C6C7")) + 
+  scale_fill_manual(values = c("ASV" = "#616569",
+                               "FUNC" = "#C5C6C7")) + 
   theme_bw() + 
   theme(axis.text.x = element_blank(),
         axis.title.x = element_blank(),
@@ -93,7 +99,7 @@ net_mod_component_counts_barplot =
         strip.text.x = element_text(size = 14))
 
 # Export figure
-pdf(file = "figures_output/FRAM_RAS_F4_MOD_component_counts_barplot.pdf",
+pdf(file = paste0(output_figures,"/FRAM_RAS_F4_MOD_component_counts_barplot.pdf"),
     height = 5, width = 7)
 net_mod_component_counts_barplot
 dev.off()
@@ -102,7 +108,7 @@ dev.off()
 
 ### Determine the number of ASVs and Functions assigned to each module
 mic_asv_func_network_module_counts = 
-  mic_net_mod_node_assignments %>%
+  net_mod_components %>%
   select(Module, type) %>%
   table() %>%
   as.data.frame()
@@ -110,8 +116,8 @@ mic_asv_func_network_module_counts =
 ### Determine the combined module relative abundance of functional components
 mic_func_module_rel_abund_long = 
   mic_func_rel_wide %>%
-  filter(funcID %in% mic_net_mod_node_assignments$nodeId) %>%
-  left_join(mic_net_mod_node_assignments, by=c("funcID" = "nodeId")) %>%
+  filter(funcID %in% net_mod_components$nodeId) %>%
+  left_join(net_mod_components, by=c("funcID" = "nodeId")) %>%
   reshape2::melt(id.vars=c("funcID","Module","type"),
                  variable.name = "RAS_id", value.name="Rel_abund") %>%
   aggregate(Rel_abund~Module+RAS_id, data=., FUN=sum) %>%
@@ -122,8 +128,8 @@ mic_func_module_rel_abund_long =
 ### Determine the combined module relative abundance of ASV components
 mic_asv_module_rel_abund_long = 
   mic_asv_rel %>%
-  filter(nodeId %in% mic_net_mod_node_assignments$nodeId) %>%
-  left_join(mic_net_mod_node_assignments, by="nodeId") %>%
+  filter(nodeId %in% net_mod_components$nodeId) %>%
+  left_join(net_mod_components, by="nodeId") %>%
   reshape2::melt(id.vars=c("nodeId","Module","type"), 
                  variable.name="RAS_id", value.name="Rel_abund") %>%
   aggregate(Rel_abund~Module+type+RAS_id,
@@ -199,7 +205,7 @@ net_module_M5_dynamics = plot_module_abund(mic_asv_module_rel_abund_long_split$M
 
 ### Combine all plots and export
 library(patchwork)
-pdf(file="figures_output/FRAM_RAS_F4_MOD_temporal_dynamics.pdf",
+pdf(file=paste0(output_figures,"/FRAM_RAS_F4_MOD_temporal_dynamics.pdf"),
     height=10, width=8)
 (net_module_M1_dynamics+remove_x_axis)/(net_module_M2_dynamics+remove_x_axis)/
   (net_module_M3_dynamics+remove_x_axis)/(net_module_M4_dynamics+remove_x_axis)/
@@ -208,10 +214,12 @@ dev.off()
 
 ### Export module ASV and gene abundance tables
 write.table(mic_func_module_rel_abund_long,
-            file="Network_analysis/FRAM_RAS_F4_MOD_FUNC_relative_abundance.txt", sep="\t")
+            file="RAS_F4_NET_MOD_FUNC_relative_abundance.txt", sep="\t",
+            quote = F, row.names = F)
 
 write.table(mic_asv_module_rel_abund_long,
-            file="Network_analysis/FRAM_RAS_F4_MOD_ASV_relative_abundance.txt", sep="\t")
+            file="RAS_F4_NET_MOD_ASV_relative_abundance.txt", sep="\t",
+            quote = F, row.names = F)
 
 
 ### ALTERNATIVE VISUALISATION:
@@ -219,7 +227,7 @@ write.table(mic_asv_module_rel_abund_long,
 ### functions 
 
 
-pdf(file="figures_output/FRAM_RAS_F4_MOD_ASV_only_temporal_dynamics_area_nonstacked.pdf",
+pdf(file=paste0(output_figures,"/FRAM_RAS_F4_MOD_ASV_only_temporal_dynamics_area_nonstacked.pdf"),
     height=6, width=8)
 mic_asv_module_rel_abund_long %>%
   mutate(Module = factor(Module, levels = c("M3","M4","M2","M1","M6","M5"))) %>%
@@ -237,7 +245,7 @@ mic_asv_module_rel_abund_long %>%
         plot.background = element_blank())
 dev.off()  
 
-pdf(file="figures_output/FRAM_RAS_F4_MOD_function_only_temporal_dynamics.pdf",
+pdf(file=paste0(output_figures,"/FRAM_RAS_F4_MOD_function_only_temporal_dynamics.pdf"),
     height=6, width=8)
 mod_functional_temporal_area_plot = 
   mic_func_module_rel_abund_long %>%
@@ -271,140 +279,127 @@ refine_mod_df <- function(x){
   mic_asv_module_rel_abund_long_split$x %>%
     filter(Module,Type,RAS_id,Rel_abund)
 }
-mic_asv_module_rel_abund_long_split$M1_asv
-mic_func_module_rel_abund_long_split$M1_function
-
-###############
-
-##### Compare the connectivity of modules through within and between module edges
-
-library(igraph)
-
-# Import ASV and gene network cluster assignments
-net_mod_connections=
-  read.table(file="Network_analysis/FRAM_RAS_F4_NET_MOD_connections.txt",
-             sep="\t", check.names=F, header=T)
-
-mic_net_mod_number_nodes = read.table(
-            file = "Network_analysis/FRAM_RAS_F4_NET_MOD_to_nodes.txt",
-            sep="\t", header=T) %>%
-  select(Module) %>%
-  table() %>%
-  as.data.frame()
-
-net_mod_connections_norm = 
-  net_mod_connections %>%
-  left_join(mic_net_mod_number_nodes, by=c("Module_one" = "Module")) %>%
-  mutate(weight = Count/Freq) %>%
-  select(-Count,-Freq)
-
-
-module_colours = c("M1" = "#008066",
-                   "M2" = "#55DDFF",
-                   "M3" = "#FFB300",
-                   "M4" = "#F55BF5",
-                   "M5" = "#490092",
-                   "M6" = "#920000")
-
-
-net_mod_connections_norm
-
-net_mod_connections_graph <- graph_from_data_frame(net_mod_connections_norm,
-                                                   directed=T)
-
-E(net_mod_connections_graph)$width <- E(net_mod_connections_graph)$weight
-
-# Define layout style
-layout <- layout_with_gem(net_mod_connections_graph)
-
-layout <- layout_on_grid(net_mod_connections_graph)
-# Visualise and export the network
-#pdf(file="figures_output/FRAM_RAS_F4_MOD_cazyme_substrate_network.pdf",
-#    height = 10, width = 10)
-plot(net_mod_connections_graph,
-     layout=layout,
-     edge.width = E(net_mod_connections_graph)$weight/max(E(net_mod_connections_graph)$weight)*30,
-     edge.arrow.size = 0.5,
-     vertex.label.cex = 1.5,
-     vertex.label.color = "black",
-     vertex.size = 20,
-     vertex.color = module_colours[V(net_mod_connections_graph)$name],
-     edge.color = "gray",
-     vertex.label.dist = 0
-)
-#dev.off()
-
-
 
 ###############
 
 ##### What are the factors driving module dynamics?
 
-# Import files
-net_mod_env_corr=read.table(
-  file="Network_analysis/FRAM_RAS_F4_NET_MOD_env_correlation_coefficients.csv", sep=";",
-  check.names=F, header=T, row.names=1) %>%
-  tibble::rownames_to_column(., var="Module_part") %>%
-  mutate(Module_part = case_when(
-    Module_part == "Bac2" ~ "M1 - ASV",
-    Module_part == "Gen2" ~ "M1 - FUNC",
-    Module_part == "Bac4" ~ "M2 - ASV",
-    Module_part == "Gen4" ~ "M2 - FUNC",
-    Module_part == "Bac1" ~"M3 - ASV",
-    Module_part == "Gen1" ~"M3 - FUNC",
-    Module_part == "Bac5" ~ "M4 - ASV",
-    Module_part == "Gen5" ~ "M4 - FUNC",
-    Module_part == "Bac3" ~ "M5 - ASV",
-    Module_part == "Gen3" ~ "M5 - FUNC",
-  ))
+# First let's filter our metadata table to continuous variables and zero-mean variance
+# standardize them
+sample_meta_stand = 
+  sample_meta %>%
+  select(RAS_id,MLD,temp,Chl_a,sal,O2_conc,CO2,pH,PAR_satellite) %>%
+  tibble::column_to_rownames(., var = "RAS_id") %>%
+  decostand(., method="standardize", MARGIN=2, na.rm=T) %>%
+  tibble::rownames_to_column(., var = "RAS_id")
 
-net_mod_env_p_vals=read.table(
-  file="Network_analysis/FRAM_RAS_F4_NET_MOD_env_correlation_pvals.csv", sep=";",
-  check.names=F, header=T, row.names=1) %>%
-  tibble::rownames_to_column(., var="Module_part") %>%
-  mutate(Module_part = case_when(
-    Module_part == "Bac2" ~ "M1 - ASV",
-    Module_part == "Gen2" ~ "M1 - FUNC",
-    Module_part == "Bac4" ~ "M2 - ASV",
-    Module_part == "Gen4" ~ "M2 - FUNC",
-    Module_part == "Bac1" ~"M3 - ASV",
-    Module_part == "Gen1" ~"M3 - FUNC",
-    Module_part == "Bac5" ~ "M4 - ASV",
-    Module_part == "Gen5" ~ "M4 - FUNC",
-    Module_part == "Bac3" ~ "M5 - ASV",
-    Module_part == "Gen3" ~ "M5 - FUNC",
-  ))
+### FUNCTION: Calculate pearson's correlation between diversity metrics and env variables
+diversity_vs_env_correlation <- function(infile, sample_meta_stand){
+  infile %>%
+    select(RAS_id,Rel_abund) %>%
+    left_join(sample_meta_stand, by = "RAS_id") %>% 
+    tibble::column_to_rownames(., var="RAS_id") %>%
+    as.matrix() %>%
+    rcorr(.)
+}
 
-# Reformat correlation coefficient dataframe
-net_mod_env_corr_long = 
-  net_mod_env_corr %>%
-  reshape2::melt(id.vars="Module_part", variable.name="Env_param",value.name="corr_coef")
+### FUNCTION: Process correlation output into dataframe
+process_correlation_matrix <- function(infile_cor, infile_p) {
+  x <- upper.tri(infile_cor)
+  y = data.frame(
+    row = rownames(infile_cor)[row(infile_cor)[x]],
+    column = rownames(infile_cor)[col(infile_cor)[x]],
+    cor  =(infile_cor)[x],
+    p = infile_p[x]
+  )
+  return(y)
+}
 
-# Reformat p-val dataframe and combine with coefficients
-net_mod_env_cor_and_p = 
-  net_mod_env_p_vals %>%
-  reshape2::melt(id.vars="Module_part", variable.name="Env_param",value.name="p_val") %>%
-  mutate(p_val = case_when(
-    p_val < 0.05 ~ p_val)) %>%
-  filter(p_val != "NA") %>%
-  left_join(net_mod_env_corr_long, by=c("Module_part","Env_param")) %>%
-  mutate(Module = case_when(
-    Module_part = grepl("_1",Module_part) ~ paste0("M1"),
-    Module_part = grepl("_2",Module_part) ~ paste0("M2"),
-    Module_part = grepl("_3",Module_part) ~ paste0("M3"),
-    Module_part = grepl("_4",Module_part) ~ paste0("M4"),
-    Module_part = grepl("_5",Module_part) ~ paste0("M5"))) %>%
-  arrange(Module,Module_part) %>%
-  mutate(Module_part = factor(Module_part, levels=unique(Module_part)))
+### FUNCTION: multiple testing correction and significance filtering
+correct_and_filter_cor_results <- function(cor_df, asv_or_func, modname){
+  adjusted_p = p.adjust(cor_df$p, method = "bonferroni")
+  cor_df %>%
+    mutate(p_adj = adjusted_p) %>% 
+    filter(p_adj < 0.05) %>%
+    filter(row == "Rel_abund") %>%
+    mutate(Type = asv_or_func) %>%
+    mutate(Module = modname)
+}
 
-# Produce heatmap showcasing correlation coefficients
+# Run above functions for the both module ASV abundance and function abundance
+# and create a dataframe containing correlation coefficients associated with 
+# adjusted p-values < 0.05
+
+for (modname in c("M1","M2","M3","M4","M5")){
+  input_file = mic_asv_module_rel_abund_long %>%
+    filter(., Module == modname)
+  
+  cor_results = diversity_vs_env_correlation(input_file, sample_meta_stand)
+  
+  cor_df = process_correlation_matrix(cor_results$r, cor_results$P)
+  
+  df_output_name  = paste0(modname,"_asv_env_cor_sig_df")
+  assign(df_output_name, correct_and_filter_cor_results(cor_df, "ASV", modname))
+}
+
+for (modname in c("M1","M2","M3","M4","M5")){
+  input_file = mic_func_module_rel_abund_long %>%
+    filter(., Module == modname)
+  
+  cor_results = diversity_vs_env_correlation(input_file, sample_meta_stand)
+  
+  cor_df = process_correlation_matrix(cor_results$r, cor_results$P)
+  
+  df_output_name  = paste0(modname,"_func_env_cor_sig_df")
+  assign(df_output_name, correct_and_filter_cor_results(cor_df, "FUNC", modname))
+}
+
+# Combine the outputs into single dataframe
+module_asv_func_vs_env_sig_cor_df = 
+  rbind(M1_asv_env_cor_sig_df, M2_asv_env_cor_sig_df, M3_asv_env_cor_sig_df,
+      M4_asv_env_cor_sig_df, M5_asv_env_cor_sig_df,
+      M1_func_env_cor_sig_df, M2_func_env_cor_sig_df, M3_func_env_cor_sig_df,
+      M4_func_env_cor_sig_df, M5_func_env_cor_sig_df)
+
+
+### Now we want to calculate and add in the confidence intervals for our
+### coefficients with a p-value < 0.05
+
+### FUNCTION: calculate confidence interval for correlation coefficients
+calculate_ci <- function(correlation, n) {
+  z <- 0.5 * log((1 + correlation) / (1 - correlation))
+  se <- 1 / sqrt(n - 3)
+  alpha <- 0.05  # 95% confidence interval
+  z_critical <- qnorm(1 - alpha / 2)
+  ci <- tanh(c(z - z_critical * se, z + z_critical * se))
+  return(ci)
+}
+
+# Add in columns to store the lower and upper bound confidence intervals
+ci_lower <- numeric(nrow(module_asv_func_vs_env_sig_cor_df))
+ci_upper <- numeric(nrow(module_asv_func_vs_env_sig_cor_df))
+
+# Loop through significant correlation dataframe and calculate confidence intervals
+for (i in 1:nrow(module_asv_func_vs_env_sig_cor_df)) {
+  correlation <- module_asv_func_vs_env_sig_cor_df$cor[i]
+  n <- 97
+  ci <- calculate_ci(correlation, n)
+  ci_lower[i] <- ci[1]
+  ci_upper[i] <- ci[2]
+}
+
+# Add the confidence intervals to the respective columns
+module_asv_func_vs_env_sig_cor_df$ci_lower <- ci_lower
+module_asv_func_vs_env_sig_cor_df$ci_upper <- ci_upper
+
+
+### Visualise the significant correlations
+
 net_mod_env_sig_corr_heatmap = 
-  ggplot(net_mod_env_cor_and_p,
-       aes(x = Env_param, y = Module_part)) + 
-  geom_tile(aes(fill = corr_coef)) + 
-  #geom_text(aes(label = round(corr_coef,3)), size = 4) + 
-  scale_fill_gradient2(limits=c(-1,1), 
-                       low = "#40004B", high = "#00441B", mid = "#ffffff") +
+  ggplot(module_asv_func_vs_env_sig_cor_df, aes(y=Type, x=column)) +
+  geom_tile(aes(fill=cor)) + 
+  scale_fill_gradient2(limits=c(-1,1),
+                       low = "#40004B", high = "#00441B", mid = "#ffffff") + 
   labs(fill = "Pearson's correlation") + 
   facet_wrap(Module~., scales = "free_y", ncol = 1, nrow = 6) +
   scale_y_discrete(limits=rev) + 
@@ -418,21 +413,28 @@ net_mod_env_sig_corr_heatmap =
         strip.background = element_blank(),
         strip.text = element_blank())
 
-pdf(file="figures_output/FRAM_RAS_F4_MOD_env_corr_heatmap.pdf",
+pdf(file=paste0(output_figures,"/RAS_F4_MOD_env_corr_heatmap.pdf"),
     width = 8, height = 10)
 net_mod_env_sig_corr_heatmap
 dev.off()
+
+### Export correlation table
+write.table(module_asv_func_vs_env_sig_cor_df,
+            file=paste0(output_tables,"/RAS_F4_MOD_ASV_FUNC_vs_env_cor_results.txt"), sep="\t")
+
 
 
 ################ 
 
 #####
 
-### Create tables with information about module components
+### This section is completely optional!
+### It creates and outputs a table for each module that contains only the kegg ko
+### information. These files can directly be uploaded to kegg mapper to explore
+### metabolic maps
 
 # Filter above table to only include functions with KEGG annotation in preparation for 
 # gene enrichment analysis
-head(clust_to_func_to_net_mod)
 kegg_func_modules = 
   clust_to_func_to_net_mod %>%
   select(Module,funcID,FUNC) %>%
@@ -474,22 +476,20 @@ options(scipen=999)
 
 # Import module to asv info
 net_mod_components=read.table(
-  file="Network_analysis/FRAM_RAS_F4_NET_MOD_assignments.txt", sep="\t",
+  file="RAS_F4_NET_MOD_assignments.txt", sep="\t",
   check.names=F, header=T)
 
 # Import microbial ASV relative abundance data
-mic_asv_rel=read.table(file="ASV/RAS_F4_MIC_ASV_filt_rare_rel.txt", sep="\t",
+mic_asv_rel=read.table(file="RAS_F4_MIC_ASV_filt_rare_rel.txt", sep="\t",
                        check.names=F, header=T)
 
 # Import microbial ASV taxa info
-mic_asv_taxa=read.table(file="ASV/RAS_F4_MIC_ASV_filt_taxa.txt", sep="\t",
+mic_asv_taxa=read.table(file="RAS_F4_MIC_ASV_filt_taxa.txt", sep="\t",
                        check.names=F, header=T)
 
-
 # Import module node connections
-net_mod_connections = read.table(file="Network_analysis/FRAM_RAS_F4_NET_MOD_node_weights_and_pvals.txt",
+net_mod_connections = read.table(file="RAS_F4_NET_MOD_node_weights_and_pvals.txt",
                                  sep="\t", check.names=F, header=T)
-
 
 #####
   
@@ -582,7 +582,7 @@ net_mod_top10_asv_max_abund_barplot =
 
 net_mod_top10_num_connections_with_asvs_barplot = 
   net_mod_top10_abund_asv_connections_within_mod %>%
-  filter(., type == "prok") %>%
+  filter(., type == "ASV") %>%
   ggplot(data=., aes(x = norm_count, y = ASV_genus)) + 
   geom_bar(fill="#D9DDDC", stat="identity", position="identity", show.legend=F) + 
   facet_wrap(Module_from~., scales="free_y", ncol = 1, nrow = 6) + 
@@ -596,7 +596,7 @@ net_mod_top10_num_connections_with_asvs_barplot =
 
 net_mod_top10_num_connections_with_func_barplot = 
   net_mod_top10_abund_asv_connections_within_mod %>%
-  filter(., type == "func") %>%
+  filter(., type == "FUNC") %>%
   ggplot(data=., aes(x = norm_count, y = ASV_genus)) + 
   geom_bar(fill="#787276", stat="identity", position="identity", show.legend=F) + 
   facet_wrap(Module_from~., scales="free_y", ncol = 1, nrow = 6) + 
@@ -609,7 +609,7 @@ net_mod_top10_num_connections_with_func_barplot =
         axis.title.y = element_blank())
 
 ### Merge figures and export
-pdf(file = "figures_output/FRAM_RAS_F4_MOD_most_abund_asvs_barplot.pdf",
+pdf(file = paste0(output_figures,"/FRAM_RAS_F4_MOD_most_abund_asvs_barplot.pdf"),
     height = 10, width = 10)
 net_mod_top10_asv_max_abund_barplot+net_mod_top10_num_connections_with_asvs_barplot+
   net_mod_top10_num_connections_with_func_barplot+plot_layout(widths=c(4,2,2))
@@ -637,16 +637,6 @@ net_mods_most_abund_genera = net_mods_to_asv %>%
   arrange(Module,desc(Rel_abund)) %>%
   mutate(Genus = factor(Genus, levels = unique(Genus)))
 
-net_mods_most_abund_genera
-
-# set module colours for plots
-module_colours = c("M1" = "#008066",
-                   "M2" = "#55DDFF",
-                   "M3" = "#FFB300",
-                   "M4" = "#F55BF5",
-                   "M5" = "#490092",
-                   "M6" = "#920000")
-
 # Plot maximum relative abundance of genera as barchart
 # First need to use interaction between Genus and Module to enforce the correct
 # ordering of Genus in the faceted plot
@@ -672,65 +662,56 @@ net_mod_most_abund_genera_bar_facet =
         legend.title = element_text(size = 12),
         legend.text = element_text(size = 12))
 
-pdf(file = "figures_output/FRAM_RAS_F4_MOD_most_abund_genera_bar.pdf",
+pdf(file = paste0(output_figures,"/FRAM_RAS_F4_MOD_most_abund_genera_bar.pdf"),
     height = 10, width = 6)
 net_mod_most_abund_genera_bar_facet
 dev.off()
 
 
-##### MODULE FUNCTIONAL COMPOSITION
-###
 
-# Import KEGG database (will be used to annotate the KEGG ko in module functional
-# components)
-kegg_db=read.csv(
-  file="C:/Users/tpriest/OneDrive - ETH Zurich/Methods/KEGG_database_complete.txt", sep="\t",
-  check.names=F, header=T)
 
-# Import FuncID to functional information
-func_id_to_func_to_net_mod=read.csv(
-  file="Network_analysis/FRAM_RAS_F4_NET_MOD_func_and_geneclust.txt",
-  sep="\t",check.names=F, header=T) %>%
-  select(funcID,FUNC,Module)
+################
 
-### The primary assessment on module functional composition will be based on two angles:
-# 1) KEGG pathway maps
-# 2) Carbohydrate-active enyzme composition
+### Figure 5b - module functional composition
 
-### 1) KEGG pathway maps
+###############
+
+### KEGG metabolism composition
+
+# The primary comparison between module functional composition is based on
+# those functions annotated by the KEGG database. In particular, it is 
+# focused on KEGG pathway maps.
+
 # As we are leveraging the functional annotations from eggnog orthologs,
-# there are instances where a Function cluster is associated with multiple KEGG KO annotations.
+# there are instances where a functional cluster is associated with multiple KEGG KO annotations.
 # For the coarse grained analysis on KEGG pathway maps, we will consider all of
-# the possible KO's, however, ensuring that no single Functional cluster is assigned
+# the possible KO's, however, ensuring that no single functional cluster is assigned
 # to two different KEGG ko's within the same pathway.
 # This will allow us to assess the differences in counts of KO's associated with
 # a pathway across modules. But we can not use this approach to make quantitative assessments
-# between pathways.
-net_mod_func_kegg_only = 
-  func_id_to_func_to_net_mod %>%
-  filter(., grepl("^ko",FUNC)) %>%
-  mutate(FUNC = gsub("ko:","",FUNC)) %>%
-  unique()
+# between pathways only within pathways across modules.
 
-net_mod_kegg_comp = 
-  separate_rows(net_mod_func_kegg_only, FUNC, sep=",") %>%
-  left_join(kegg_db, by=c("FUNC" = "KEGG_ko")) %>%
-  unique() %>%
-  filter(., grepl(".",KEGG_category)) %>%
-  as.data.frame() %>%
-  distinct(FUNC, KEGG_pathway_map, .keep_all = TRUE)
+# The module kegg functional profiles have already been provided to you
 
-write.table(net_mod_kegg_comp,
-            file = "Network_analysis/FRAM_RAS_F4_NET_MOD_kegg_functional_composition.txt", sep="\t",
-            row.names=F)
+### Import Module KEGG KO compositions
+
+# Import FuncID to functional information
+func_id_to_func_to_net_mod = 
+  read.table(file="RAS_F4_GENES_CLUSTID_to_FUNCID_to_FUNC_to_MOD.txt",
+             sep="\t", header=T, check.names=F)
+
+# Import table containing kegg composition information
+net_mod_kegg_comp=read.csv(
+  file = "RAS_F4_NET_MOD_kegg_functional_composition.txt",
+  sep="\t",check.names=F, header=T)
 
 ### To gain an overview on differences in metabolic features between modules,
 ### we will focus on energy metabolisms as well as a selection of those with high
 ### variance between modules
 
 # Create table with list of kEGG pathways in Energy metabolism
-kegg_energy_mods = 
-  kegg_db %>%
+kegg_energy_metabolism_names = 
+  net_mod_kegg_comp %>%
   filter(., grepl("Energy metabolism",KEGG_pathway_map)) %>%
   filter(., !grepl("Oxidative",KEGG_module) & 
            !grepl("antenna",KEGG_module) & 
@@ -773,9 +754,14 @@ kegg_modules_of_interest_counts =
   filter(KEGG_module %in% kegg_modules_of_interest$KEGG_module) %>%
   mutate(KEGG_module = factor(KEGG_module, levels=unique(kegg_modules_of_interest$KEGG_module)))
 
-# Now to supplement this further, add in information on the number of CAZyme
-# families assigned to each module
-# Filter out CAZyme hits from funcID to functional annotation table
+###
+
+### Carbohydrate-active enzyme (CAZymes) composition
+
+# We also supplement the functional comparison between modules based on 
+# the composition of CAZymes
+
+# Filter out CAZyme annotations from the functional profile
 net_mod_cazymes = 
   func_id_to_func_to_net_mod %>%
   filter(., grepl("^GH",FUNC) |
@@ -791,7 +777,8 @@ net_mod_cazymes =
            !grepl("PSD",FUNC)) %>%
   unique()
 
-# Determine total count of CAZyme genes in each module
+# Determine total count of CAZyme genes in each module and then combine this
+# with the counts of the selected KEGG metabolisms
 metabolisms_of_interest_counts = net_mod_cazymes %>%
   select(Module) %>%
   table() %>%
@@ -799,6 +786,8 @@ metabolisms_of_interest_counts = net_mod_cazymes %>%
   mutate(KEGG_module = "CAZyme_families") %>%
   rbind(., kegg_modules_of_interest_counts) %>%
   mutate(KEGG_module = factor(KEGG_module, levels=unique(KEGG_module)))
+
+### Create a bar plot summarising functional composition of modules 
 
 net_mod_kegg_top_metab_modules_plot = 
   metabolisms_of_interest_counts %>%
@@ -819,7 +808,7 @@ net_mod_kegg_top_metab_modules_plot =
 net_mod_kegg_top_metab_modules_plot
 
 # Export plot
-pdf(file = "figures_output/FRAM_RAS_F4_MOD_KEGG_top_metab_modules_barchart.pdf",
+pdf(file = paste0(output_figures,"/FRAM_RAS_F4_MOD_KEGG_top_metab_modules_barchart.pdf"),
     height = 10, width = 14)
 net_mod_kegg_top_metab_modules_plot
 dev.off()
@@ -827,37 +816,36 @@ dev.off()
 
 ################
 
-######
-###
-### Correlations between module ASVs and euakryotic ASVs
+### Figure 6 - correlations between module prokaryotic ASVs and microeukaryotic ASVs
+
+###############
+
 library(circlize)
 
-# import tables
+### import tables
 
-mic_asv_to_euk_asv_cor = read.table(file = "Network_analysis/FRAM_RAS_F4_MIC_and_EUK_ASV_correlations.csv",
-           sep=";", header=T, check.names=F) %>%
-  mutate(from = sub("bac_","prok_",from))
+mic_asv_to_euk_asv_cor = read.table(file = "RAS_F4_MIC_and_EUK_ASV_correlations.txt",
+           sep="\t", header=T, check.names=F) 
 
-mic_asv_taxa = read.table(file = "ASV/RAS_F4_MIC_ASV_taxa.txt",
+mic_asv_taxa = read.table(file = "RAS_F4_MIC_ASV_taxa.txt",
                                     sep="\t", header=T, check.names=F)
 
-euk_asv_taxa = read.table(file = "ASV/RAS_F4_EUK_ASV_taxa.txt",
+euk_asv_taxa = read.table(file = "RAS_F4_EUK_ASV_taxa.txt",
                           sep="\t", header=T, check.names=F)
 
-
 net_mod_to_asv=read.table(
-  file="Network_analysis/FRAM_RAS_F4_NET_MOD_assignments.txt", sep="\t",
+  file="RAS_F4_NET_MOD_assignments.txt", sep="\t",
   check.names=F, header=T) %>%
   filter(., grepl("prok_",nodeId)) %>%
   select(nodeId,Module)
 
 net_mod_mic_asv_to_euk_corr = 
   mic_asv_to_euk_asv_cor %>%
-  left_join(net_mod_to_asv, by=c("from" = "nodeId")) %>%
+  left_join(net_mod_to_asv, by=c("From" = "nodeId")) %>%
   filter(., Module != "NA") %>%
-  filter(., p_value < 0.05) %>%
-  left_join(euk_asv_taxa, by=c("to" = "ASV_name")) %>%
-  filter(., corr > 0.7) %>%
+  filter(., Adjusted_p_value < 0.05) %>%
+  left_join(euk_asv_taxa, by=c("To" = "ASV_name")) %>%
+  filter(., Pearson_R > 0.7) %>%
   arrange(Module,Phylum,Class,Family)
 
 from = paste(net_mod_mic_asv_to_euk_corr[[5]])
@@ -884,7 +872,7 @@ chord_cols_all <- c(module_colours,genus_cols)
 
 circos.clear()
 circos.par(start.degree = 0)
-pdf(file="figures_output/FRAM_RAS_F4_NET_MOD_bac_ASVs_euk_corr_chord_diagram.pdf",
+pdf(file=paste0(output_figures,"/FRAM_RAS_F4_NET_MOD_bac_ASVs_euk_corr_chord_diagram.pdf"),
     height = 12, width = 12)
 chordDiagram(mat, order = union(rownames(mat), colnames(mat)), 
              big.gap = 25, directional = TRUE, grid.col=chord_cols_all,
@@ -898,11 +886,11 @@ circos.track(track.index = 1, panel.fun = function(x, y) {
 
 dev.off()
 
-######
+################
 
+### Figure 7 - genetic diversity within functions
 
-######
-######
+###############
 
 ### Compare variations in diversity of functions over time based on gene clusters
 
@@ -915,13 +903,13 @@ library(furrr)
 library(vegan)
 
 # Import gene clust ID to FUNC ID to FUNCTION info
-clustID_to_funcID_to_FUNC_to_NetMod=read.table(
-  file="Network_analysis/FRAM_RAS_F4_NET_MOD_func_and_geneclust.txt", sep="\t",
-  check.names=F, header=T)
+clustID_to_funcID_to_FUNC_to_NetMod = 
+  read.table(file="RAS_F4_GENES_CLUSTID_to_FUNCID_to_FUNC_to_MOD.txt",
+             sep="\t", header=T, check.names=F)
 
 # Import gene cluster raw count data
 ras_mg_geneclust_raw_abund=read.table(
-  file="metagenomes/community_gene_profiles/FRAM_RAS_F4_GENE_CLUSTID_filt_raw_wide.txt",
+  file="RAS_F4_GENE_CLUSTID_filt_raw_wide.txt",
   sep="\t",check.names=F, header=T)
 
 # Import sample name to RAS_id mapping file
@@ -932,7 +920,7 @@ RAS_id_to_date = read.table(file="RAS_F4_META.txt", sep="\t",
 
 # Import function relative abundance table
 mic_clust_func_rel_abund_long = read.table(
-  file="time_series_analysis/FRAM_RAS_F4_MIC_GENE_OSC4_FUNC_rel_abund_wide.txt",
+  file="RAS_F4_MIC_OSC4_FUNC_CLUST_rel_abund_wide.txt",
   check.names=F, sep="\t") %>%
   tibble::rownames_to_column(., var="nodeId") %>%
   reshape2::melt(id.vars="nodeId", variable.name="RAS_id", value.name="Rel_abund")
@@ -959,7 +947,7 @@ clustID_to_funcID_to_FUNC_to_NetMod %>%
 
 (2478/(2478+8842))*100
 
-## Calculate per module frequency of singleton and multiple gene-cluster functions
+### Calculate per module proportions of singleton and multiple gene-cluster functions
 mod_func_prop_singleton_and_multiple = 
   clustID_to_funcID_to_FUNC_to_NetMod %>%
   select(Module,funcID) %>%
@@ -978,9 +966,9 @@ mod_func_prop_singleton_and_multiple =
   decostand(., method = "total", MARGIN=1) %>%
   tibble::rownames_to_column (., var="Module") %>%
   reshape2::melt(., variable.name = "Category", value.name = "Proportion")
-mod_func_prop_singleton_and_multiple
 
-## Visualise proportions in pie charts
+
+### Visualise proportions in pie charts
 mod_func_prop_singleton_and_multiple_piecharts = 
   ggplot(mod_func_prop_singleton_and_multiple, aes(x="", y=Proportion, fill=Category)) +
   geom_bar(stat="identity", width=1) +
@@ -993,8 +981,8 @@ mod_func_prop_singleton_and_multiple_piecharts =
         legend.text = element_text(size = 11),
         strip.text.x = element_text(size = 11))
 
-# export figure
-pdf(file="figures_output/FRAM_RAS_F4_NET_MOD_func_singleton_vs_multi_piecharts.pdf", height=4, width=8)
+### export figure
+pdf(file=paste0(output_figures,"/FRAM_RAS_F4_NET_MOD_func_singleton_vs_multi_piecharts.pdf"), height=4, width=8)
 mod_func_prop_singleton_and_multiple_piecharts
 dev.off()
 
@@ -1101,7 +1089,7 @@ result_df_filt = result_df[result_df$nodeId %in% func_with_div_values$nodeId, ]
 
 ### Export this dataframe
 write.table(result_df_filt,
-            file="Network_analysis/FRAM_RAS_F4_FUNC_shannon_diversity_per_func.txt",
+            file=paste0(output_tables,"/FRAM_RAS_F4_FUNC_shannon_diversity_per_func.txt"),
             sep="\t")
 
 ### Now investigate linear relationship between shannon diversity and module functions
@@ -1268,13 +1256,13 @@ for (modulename in c("M1","M2","M3","M4","M5")){
 
 ## Export plots (will export separately and join into figure later as the plots are 
 ## large and their composite nature renders combining them challenging)
-pdf(file = "figures_output/FRAM_RAS_F4_NET_MOD_ALL_func_abund_vs_diversity_scatter.pdf",
+pdf(file = paste0(output_figures,"/FRAM_RAS_F4_NET_MOD_ALL_func_abund_vs_diversity_scatter.pdf"),
     height = 8, width = 10)
 M1_functions_rel_abund_and_diversity_scatter+M2_functions_rel_abund_and_diversity_scatter+M3_functions_rel_abund_and_diversity_scatter+
   M4_functions_rel_abund_and_diversity_scatter+M5_functions_rel_abund_and_diversity_scatter+plot_spacer()+plot_layout(ncol=3,nrow=2)
 dev.off()
 
-pdf(file = "figures_output/FRAM_RAS_F4_NET_MOD_ALL_func_abund_vs_diversity_sig_bars.pdf",
+pdf(file = paste0(output_figures,"/FRAM_RAS_F4_NET_MOD_ALL_func_abund_vs_diversity_sig_bars.pdf"),
     height = 8, width = 9)
 M1_functions_rel_abund_and_diversity_signif_bar+M2_functions_rel_abund_and_diversity_signif_bar+M3_functions_rel_abund_and_diversity_signif_bar+
   M4_functions_rel_abund_and_diversity_signif_bar+M5_functions_rel_abund_and_diversity_signif_bar+plot_spacer()+plot_layout(ncol=3,nrow=2)
@@ -1283,7 +1271,7 @@ dev.off()
 ## Export table with significant lm results after correction to prevent 
 ## recalculation later 
 write.table(net_mod_func_signif_lm_df,
-            file="Network_analysis/FRAM_RAS_F4_NET_MOD_FUNC_shannon_div_vs_abund_lm_sig_results.txt",
+            file=paste0(output_tables,"/FRAM_RAS_F4_NET_MOD_FUNC_shannon_div_vs_abund_lm_sig_results.txt"),
             sep="\t")
 
 ### Beyond exploring whether the diversity shifts over time, we are also interested
@@ -1298,18 +1286,18 @@ write.table(net_mod_func_signif_lm_df,
 
 # Import the combined functional gene abundance information for modules
 net_mod_func_rel_abund = 
-  read.table(file="Network_analysis/FRAM_RAS_F4_MOD_FUNC_relative_abundance.txt", 
+  read.table(file="RAS_F4_NET_MOD_FUNC_relative_abundance.txt", 
              sep="\t", header=T)
+
+# Import the functional cluster abundance information for modules
+mic_func_rel = 
+  read.table(file="RAS_F4_MIC_OSC4_FUNC_CLUST_rel_abund_wide.txt", 
+             sep="\t", header=T, check.names = F)
 
 # Import network module assignments
 net_mod_components = 
-  read.table(file="Network_analysis/FRAM_RAS_F4_NET_MOD_assignments.txt", 
+  read.table(file="RAS_F4_NET_MOD_assignments.txt", 
              sep="\t", header=T)
-
-# Import gene clust ID to FUNC ID to FUNCTION info
-clustID_to_funcID_to_FUNC_to_NetMod=read.table(
-  file="Network_analysis/FRAM_RAS_F4_NET_MOD_func_and_geneclust.txt", sep="\t",
-  check.names=F, header=T)
 
 # Create funcID to FUNC mapping
 funcID_to_func_mapping =
@@ -1335,19 +1323,8 @@ mod_sample_peaks = net_mod_func_rel_abund %>%
   select(Module,RAS_id,year) %>%
   mutate(mod_and_peak = paste(Module,"-",RAS_id,sep=""))
 
-# Import ASV and gene network cluster assignments
-mic_asv_func_network_modules=
-  read.table(file="Network_analysis/FRAM_RAS_F4_NET_MOD_assignments.txt",
-             sep="\t", check.names=F, header=T)
-
-# Import funcID relative abundance table
-mic_func_rel=read.table(file="time_series_analysis/FRAM_RAS_F4_MIC_GENE_OSC4_FUNC_rel_abund_wide.txt",
-                        sep="\t", header=T, check.names = F) %>%
-  tibble::rownames_to_column(., var="funcID") %>%
-  melt(., variable.name="RAS_id", value.name="func_rel_abund")
-
 # Import gene cluster abundance table
-mic_gene_clust_rel = read.table(file="time_series_analysis/FRAM_RAS_F4_MIC_GENE_CLUST_OSC4_rel_abund_wide.txt",
+mic_gene_clust_rel = read.table(file="RAS_F4_MIC_GENE_CLUST_OSC4_rel_abund_wide.txt",
            sep="\t", check.names=F, header=T) %>%
   tibble::rownames_to_column(., var="clustID") %>%
   melt(., variable.name="RAS_id", value.name="gene_rel_abund")
@@ -1423,7 +1400,17 @@ calc_freq_of_top_gene_clust_recurring <- function(mod_peak_gene_clust,funcID_to_
     unique()
 }
 
-
+tmp = clustID_to_funcID_to_FUNC_to_NetMod %>%
+  filter(., Module == "M1") %>%
+  select(funcID) %>%
+  table() %>%
+  as.data.frame() %>%
+  filter(., Freq > 1) %>%
+  select(funcID)
+head(mic_func_rel)
+clustID_to_funcID_to_FUNC_to_NetMod %>%
+  filter(., funcID %in% tmp$funcID)
+  
 # Perform a loop to run over the above two functions for each module and produce
 # output tables with information
 for (modulename in c("M1","M2","M3","M4","M5")){
@@ -1526,7 +1513,7 @@ module_top_gene_cluster_freq_per_function_per_year =
         legend.text = element_text(size = 12))
 
 ### export
-pdf(file="figures_output/FRAM_RAS_F4_MOD_FUNC_gene_variant_recurrence_barplot.pdf",
+pdf(file=paste0(output_figures,"/FRAM_RAS_F4_MOD_FUNC_gene_variant_recurrence_barplot.pdf"),
     height = 6, width = 8)
 module_top_gene_cluster_freq_per_function_per_year
 dev.off()
@@ -1577,5 +1564,3 @@ diff_clust_kegg_functions =
   left_join(net_mod_kegg_composition, by=c("FUNC","Module")) %>%
   unique() %>%
   arrange(Module,KEGG_category,KEGG_pathway_map,KEGG_module,Gene_description,FUNC)
-
-
