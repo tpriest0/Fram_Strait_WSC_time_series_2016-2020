@@ -239,3 +239,5 @@ write.table(euk_asv_osc4_rel_wide,
 write.table(mic_gene_clust_osc4_rel_wide,
             file="RAS_F4_MIC_GENE_CLUST_OSC4_rel_abund_wide.txt",
             sep="\t", quote = F, row.names = F)
+
+### The "RAS_F4_MIC_ASV_OSC4_rel_abund_wide.txt" and "RAS_F4_MIC_GENE_CLUST_OSC4_rel_abund_wide.txt" are the two files provided to the network analysis scripts.
