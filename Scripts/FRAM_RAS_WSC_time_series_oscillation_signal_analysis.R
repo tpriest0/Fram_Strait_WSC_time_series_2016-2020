@@ -209,8 +209,8 @@ mic_euk_asv_gene_clust_osc4_id_list =
   filter(., Oscillations == 1) %>%
   select(ID)
 
-### Create relative abundance (ASV) and normalised count (GENEs)
-### dataframes for those with one oscillation per year as these will be 
+### Create relative abundance tables of ASVs and gene clusters
+### for those with one oscillation per year as these will be 
 ### used as the input for network analysis
 ### The EUK ASVs will not be used for network analysis, but we will still create
 ### the relevant dataframes for other comparative analysis
@@ -239,6 +239,57 @@ write.table(euk_asv_osc4_rel_wide,
 write.table(mic_gene_clust_osc4_rel_wide,
             file="RAS_F4_MIC_GENE_CLUST_OSC4_rel_abund_wide.txt",
             sep="\t", quote = F, row.names = F)
+
+### As the number of gene clusters is very high, we will not directly use them in the network analysis
+### Instead, we will group them based on functional annotations. 
+### We have functionally annotated all gene clusters against the EGGNOG database and grouped them
+### based on the annotations of matching seed orthologs. Where KEGG was available
+### this was the priority, followed by PFAM and CAZymes.
+#####
+
+### Import files
+
+# Import EGGNOG ID to geneID to function information
+clust_id_func_id_to_func=read.csv(
+  file="RAS_F4_GENES_CLUSTID_to_FUNCID_to_FUNC.txt",
+  sep="\t",check.names=F, header=T)
+
+# How many gene clusters were assigned a function based on eggnog database?
+dim(clust_id_func_id_to_func)
+
+# Move rownames to a column in relative abundance table
+mic_gene_clust_osc4_rel_wide_mod = 
+  mic_gene_clust_osc4_rel_wide %>%
+  tibble::rownames_to_column(., var="clustID")
+
+# Filter the gene cluster to functional information to retain only gene clusters
+# with a single oscillation per year, then combine with relative abundance matrix and
+# sum the abundances of gene clusters for each function in each sample. This will
+# generate an abundance profile for the functional clusters
+mic_clust_func_rel_abund_wide =  
+clust_id_func_id_to_func %>%
+  filter(clustID %in% mic_gene_clust_osc4_rel_wide_mod$clustID) %>%
+  left_join(mic_gene_clust_osc4_rel_wide_mod, by="clustID") %>%
+  reshape2::melt(., id.vars=c("clustID","FUNC","funcID"), variable.name="RAS_id",
+                 value.name="Rel_abund") %>%
+  aggregate(Rel_abund~funcID+RAS_id, data=., FUN= sum) %>%
+  reshape2::dcast(funcID~RAS_id, value.var="Rel_abund")
+
+# The functional profile will now be subject to fourier transformation and then
+# combined with the prokaryotic ASV oscillations in a network analysis
+write.table(mic_clust_func_rel_abund_wide,
+            file="RAS_F4_MIC_OSC4_FUNC_CLUST_rel_abund_wide.txt",
+            sep="\t", quote = F, row.names = F)
+
+### What is the average relative abundance of functional gene groups across samples
+mic_clust_func_rel_abund_wide %>%
+  melt(id.vars="funcID", variable.name="RAS_id", value.name="Rel_abund") %>%
+  aggregate(Rel_abund~RAS_id, data=., FUN=sum) %>%
+  arrange(desc(Rel_abund))
+
+
+
+##########################################
 
 #####
 
@@ -289,58 +340,3 @@ mic_asv_gene_osc_within_30_days %>%
 ### annual oscillations
 (336/658)*100
 (110208/485075)*100
-
-####################
-
-#####
-### Process microbial gene time-series data ready for network input
-### A correlation network will be constructed based on fourier transformed
-### information. We are specifically interested in ASVs/genes
-### with a single oscillation per year. 
-### However, because there are too many genes to include in a network,
-### the orthologous genes will be grouped based on functional annotations
-### We have used the EGGNOG seed ortholog annotations. Where KEGG was available
-### this was the priority, followed by PFAM.
-#####
-
-####################
-
-### Import files
-
-# Import EGGNOG ID to geneID to function information
-clust_id_func_id_to_func=read.csv(
-  file="RAS_F4_GENES_CLUSTID_to_FUNCID_to_FUNC.txt",
-  sep="\t",check.names=F, header=T)
-
-# How many gene clusters were assigned a function based on eggnog database?
-dim(clust_id_func_id_to_func)
-
-# Move rownames to a column in relative abundance table
-mic_gene_clust_osc4_rel_wide_mod = 
-  mic_gene_clust_osc4_rel_wide %>%
-  tibble::rownames_to_column(., var="clustID")
-
-# Filter the gene cluster to functional information to retain only gene clusters
-# with a single oscillation per year, then combine with relative abundance matrix and
-# sum the abundances of gene clusters for each function in each sample. This will
-# generate an abundance profile for the functional clusters
-mic_clust_func_rel_abund_wide =  
-clust_id_func_id_to_func %>%
-  filter(clustID %in% mic_gene_clust_osc4_rel_wide_mod$clustID) %>%
-  left_join(mic_gene_clust_osc4_rel_wide_mod, by="clustID") %>%
-  reshape2::melt(., id.vars=c("clustID","FUNC","funcID"), variable.name="RAS_id",
-                 value.name="Rel_abund") %>%
-  aggregate(Rel_abund~funcID+RAS_id, data=., FUN= sum) %>%
-  reshape2::dcast(funcID~RAS_id, value.var="Rel_abund")
-
-# The functional profile will now be subject to fourier transformation and then
-# combined with the prokaryotic ASV oscillations in a network analysis
-write.table(mic_clust_func_rel_abund_wide,
-            file="RAS_F4_MIC_OSC4_FUNC_CLUST_rel_abund_wide.txt",
-            sep="\t", quote = F, row.names = F)
-
-### What is the average relative abundance of functional gene groups across samples
-mic_clust_func_rel_abund_wide %>%
-  melt(id.vars="funcID", variable.name="RAS_id", value.name="Rel_abund") %>%
-  aggregate(Rel_abund~RAS_id, data=., FUN=sum) %>%
-  arrange(desc(Rel_abund))
