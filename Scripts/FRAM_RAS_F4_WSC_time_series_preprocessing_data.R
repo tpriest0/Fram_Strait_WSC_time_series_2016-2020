@@ -4,9 +4,15 @@
 
 ####################
 
+### Define working directory
+setwd('XXXXX')
 
-# Define working directory
-setwd('C:/Users/tpriest/OneDrive - ETH Zurich/MPI - FRAM/WSC/data_files_for_analysis')
+### Define output directories
+output_figures <- ('')
+output_tables <- ('')
+
+dir.create(output_tables)
+dir.create(output_figures)
 
 #####
 
@@ -209,66 +215,3 @@ write.table(ras_mg_geneclust_profile_rel_prop_wide,
             sep="\t", quote = F, row.names = F)
 
 
-
-###
-
-### What was the composition of the metagenomes at kingdom level? i.e. what 
-### proportion of reads was bacteria, archaea or eukarya? Read assignments were
-### performed using tiara
-
-# Import metdata
-mg_read_taxonomy=read.table(file="metagenomes/FRAM_RAS_F4_read_tiara_assignments.txt", 
-                        sep="\t",check.names=F, header=T)
-
-# Import metadata and create sample name to date mapping file
-ras_metadata=read.table(file="RAS_F4_META.txt", sep="\t",
-                        check.names=F, header=T) %>%
-  select(RAS_id,date) %>%
-  mutate(date = as.Date(date, "%d.%m.%Y"))
-
-# Reformat names to RAS_id and calculate relative proportions
-mg_read_taxonomy_rel_prop_wide = mg_read_taxonomy %>%
-  select(RAS_id,Assignment) %>%
-  table() %>%
-  as.data.frame() %>%
-  reshape2::dcast(RAS_id~Assignment, value.var="Freq", data=.) %>%
-  tibble::column_to_rownames(., var="RAS_id") %>%
-  decostand(., method="total", MARGIN=1)
-
-# Reform relative proportion table to long format and join with metadata for plotting
-mg_read_taxonomy_rel_prop_long_w_date = 
-  mg_read_taxonomy_rel_prop_wide %>%
-  tibble::rownames_to_column(., var="RAS_id") %>%
-  reshape2::melt(variable.name = "Taxonomy", value.name = "Rel_prop", data=.) %>%
-  left_join(ras_metadata, by="RAS_id") %>%
-  mutate(Taxonomy = factor(Taxonomy, levels = c("archaea","bacteria",
-                                                "prokarya","organelle",
-                                                "eukarya","unknown")))
-
-# Visualise in stacked bar plot
-taxonomy_colours = c("archaea" = "#000000",
-                     "bacteria" = "#009292",
-                     "eukarya" = "#ffb6db",
-                     "organelle" = "#db6d00",
-                     "prokarya" = "#006ddb",
-                     "unknown" = "gray90")
-
-mg_read_comp_stacked_bar = ggplot(mg_read_taxonomy_rel_prop_long_w_date,
-       aes(x = as.Date(date), y = Rel_prop)) +
-  geom_bar(aes(fill = Taxonomy), position="stack", stat="identity") + 
-  scale_x_date(date_breaks = "6 months", date_labels =  "%b %Y") +
-  scale_fill_manual(values = taxonomy_colours) +
-  labs(y = "Relative proportion (%)") + 
-  theme_bw() + 
-  theme(axis.title.y = element_text(size = 12),
-        axis.text.y = element_text(size = 10),
-        axis.text.x = element_text(size = 10, angle = 45, hjust = 1),
-        axis.title.x = element_blank(),
-        legend.text = element_text(size = 12),
-        legend.title = element_text(size = 12))
-
-# Export figure
-pdf("figures_output/FRAM_RAS_MG_read_composition_kingdom_stacked_bar.pdf",
-    height=6, width=8)
-mg_read_comp_stacked_bar
-dev.off()
