@@ -480,7 +480,7 @@ net_mod_components=read.table(
   check.names=F, header=T)
 
 # Import microbial ASV relative abundance data
-mic_asv_rel=read.table(file="RAS_F4_MIC_ASV_filt_rare_rel.txt", sep="\t",
+mic_asv_rel=read.table(file="RAS_F4_MIC_ASV_filt_rel.txt", sep="\t",
                        check.names=F, header=T)
 
 # Import microbial ASV taxa info
