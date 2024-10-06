@@ -172,46 +172,49 @@ write.table(euk_asv_taxa_filt,
 ### Processing and reformatting metagenome gene cluster profiles
 
 # Import gene cluster profile
-ras_mg_geneclust_profile=read.table(
-  file="RAS_F4_GENES_CLUSTID_abund_filt.txt",
+gene_raw_abund=read.csv(
+  file="FRAM_RAS_F4_proteins_all_clust_rep_abund.txt",
   sep="\t",check.names=F, header=T)
 
-# Create wide format raw count table with RAS_id headers
-ras_mg_geneclust_profile_raw_wide = 
-  ras_mg_geneclust_profile %>%
-  select(RAS_id,clustID,Count) %>%
-  dcast(clustID~RAS_id, value.var="Count", data=.)
+# Import information on the number of genomes sequenced in each metagenome
+num_genomes=read.csv(
+  file="data_files/FRAM_RAS_F4_num_genomes.txt",
+  sep="\t",check.names=F, header=T) %>%
+  mutate(Sample = gsub("_","-",Sample_name))
 
-# Create wide format normalised abundance table
-ras_mg_geneclust_profile_norm_wide = 
-  ras_mg_geneclust_profile %>%
-  select(RAS_id,clustID,Norm_count) %>%
-  reshape2::dcast(clustID~RAS_id, value.var="Norm_count", data=.) %>%
-  replace(., is.na(.), 0)
+# Remove genes detected in less than 3 samples
+tmp = gene_raw_abund %>%
+    aggregate(Count~Gene_rep, data=., FUN=sum) %>%
+    filter(., Count >= 3)
 
-# Create wide format relative abundance table
-ras_mg_geneclust_profile_rel_prop_wide =
-  ras_mg_geneclust_profile %>%
-  select(RAS_id,clustID,Norm_count) %>%
-  reshape2::dcast(clustID~RAS_id, value.var="Norm_count", data=.) %>%
-  replace(., is.na(.), 0) %>%
-  tibble::column_to_rownames(., var="clustID") %>%
-  decostand(., method="total", MARGIN=2) %>%
-  tibble::rownames_to_column(., var="clustID")
+# Filter gene abund table and normalise gene counts by the number of genomes sequenced
+gene_filt_raw_and_norm = gene_raw_abund %>%
+    filter(., Gene_rep %in% tmp$Gene_rep) %>%
+    left_join(num_genomes, by="Sample") %>%
+    mutate(Norm_count = Count/Num_genomes) %>%
+    mutate(Gene_clustID = paste0("geneclust_",row_number(.)))
+
+# Now create a wide format raw abundance table, relative abundance table and normalised count table
+gene_filt_raw_wide = gene_filt_raw_and_norm %>%
+    select(Gene_clustID,Sample_name,Count) %>%
+    dcast(Gene_clustID~Sample_name, value.var="Count") %>%
+    replace(., is.na(.), 0)
+
+gene_filt_norm_wide = gene_filt_raw_and_norm %>%
+    select(Gene_clustID,Sample_name,Norm_count) %>%
+    dcast(Gene_clustID~Sample_name, value.var="Norm_count") %>%
+    replace(., is.na(.), 0)
+
+gene_filt_rel_wide = 
+    gene_filt_raw_wide %>%
+    tibble::column_to_rownames(., var="Gene_clustID") %>%
+    decostand(., method = "total", MARGIN=2) %>%
+    tibble::rownames_to_column(., var="Gene_clustID")
 
 
 ### Export tables
 
-write.table(ras_mg_geneclust_profile_raw_wide,
-            file="RAS_F4_GENE_CLUSTID_filt_raw_wide.txt",
-            sep="\t", quote = F, row.names = F)
-
-write.table(ras_mg_geneclust_profile_norm_wide,
-            file="RAS_F4_GENE_CLUSTID_filt_norm_wide.txt",
-            sep="\t", quote = F, row.names = F)
-
-write.table(ras_mg_geneclust_profile_rel_prop_wide,
-            file="RAS_F4_GENE_CLUSTID_filt_rel_wide.txt",
-            sep="\t", quote = F, row.names = F)
-
+write.table(gene_filt_raw_wide_renamed, file="output_files/gene_clustering/FRAM_RAS_F4_proteins_all_clust_rep_filt_raw_wide.txt", row.names=F, quote=F)
+write.table(gene_filt_norm_wide_renamed, file="output_files/gene_clustering/FRAM_RAS_F4_proteins_all_clust_rep_filt_norm_wide.txt", row.names=F, quote=F)
+write.table(gene_filt_rel_wide_renamed, file="output_files/gene_clustering/FRAM_RAS_F4_proteins_all_clust_rep_filt_rel_wide.txt", row.names=F, quote=F)
 
