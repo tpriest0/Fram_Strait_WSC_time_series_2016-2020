@@ -7,12 +7,12 @@
 ### Define working directory
 setwd('XXXXX')
 
-### Define output directories
-output_figures <- ('')
-output_tables <- ('')
-
-dir.create(output_tables)
-dir.create(output_figures)
+### Define and create output directories
+dir.create('results')
+dir.create('results/figures')
+dir.create('results/tables')
+output_figures = ('results/figures/')
+output_tables = ('results/tables/')
 
 #####
 
@@ -29,19 +29,19 @@ library(tibble)
 ### Import data
 
 # Import microbial ASV count data
-mic_asv_raw=read.table(file="RAS_F4_MIC_ASV_raw_counts.txt", sep="\t",
+mic_asv_raw=read.table(file="FRAM_RAS_F4_MIC_ASV_raw_counts.txt", sep="\t",
                        check.names=F, header=T)
 
 # Import microbial ASV taxa information
-mic_asv_taxa=read.table(file="RAS_F4_MIC_ASV_taxa.txt", sep="\t",
+mic_asv_taxa=read.table(file="FRAM_RAS_F4_MIC_ASV_taxa.txt", sep="\t",
                        check.names=F, header=T)
 
 # Import eukaryotic ASV count data
-euk_asv_raw=read.table(file="RAS_F4_EUK_ASV_raw_counts.txt", sep="\t",
+euk_asv_raw=read.table(file="FRAM_RAS_F4_EUK_ASV_raw_counts.txt", sep="\t",
                             check.names=F, header=T)
 
 # Import eukaryotic ASV taxa information
-euk_asv_taxa=read.table(file="RAS_F4_EUK_ASV_taxa.txt", sep="\t",
+euk_asv_taxa=read.table(file="FRAM_RAS_F4_EUK_ASV_taxa.txt", sep="\t",
                         check.names=F, header=T)
 
 ##### 
@@ -60,8 +60,7 @@ mic_asv_filt_names <- mic_asv_raw %>%
   select(ASV_name)
 
 mic_asv_filt_raw_wide = mic_asv_raw %>%
-  filter(ASV_name %in% mic_asv_filt_names$ASV_name) %>%
-  tibble::column_to_rownames(., var = "ASV_name")
+  filter(ASV_name %in% mic_asv_filt_names$ASV_name) 
 
 euk_asv_filt_names <- euk_asv_raw %>%
   tibble::column_to_rownames(., var="ASV_name") %>%
@@ -73,8 +72,7 @@ euk_asv_filt_names <- euk_asv_raw %>%
   select(ASV_name)
 
 euk_asv_filt_raw_wide = euk_asv_raw %>%
-  filter(ASV_name %in% euk_asv_filt_names$ASV_name) %>%
-  tibble::column_to_rownames(., var = "ASV_name")
+  filter(ASV_name %in% euk_asv_filt_names$ASV_name) 
 
 ### Generate relative abundance tables from filtered ASV data
 mic_asv_filt_rel = 
@@ -94,25 +92,28 @@ euk_asv_filt_rel =
 ### Prokaryotic ASVs
 
 # Identify smallest read count across prokaryotic samples and rarefy the data
-head(sort(colSums(mic_asv_filt_raw_wide)))
+mic_asv_filt_raw_wide_mod = mic_asv_filt_raw_wide %>%
+  tibble::column_to_rownames(., var = "ASV_name")
+euk_asv_filt_raw_wide_mod = euk_asv_filt_raw_wide %>%
+  tibble::column_to_rownames(., var = "ASV_name")
 
-# We will remove 02_2018_F4_2 based on lack of data and rarefy samples to the
-# next lowest read count
-mic_smallest_count <- min(colSums(mic_asv_filt_raw_wide))
+head(sort(colSums(mic_asv_filt_raw_wide_mod)))
 
-mic_asv_filt_rarefied = t(rrarefy(t(mic_asv_filt_raw_wide), mic_smallest_count))
+mic_smallest_count <- min(colSums(mic_asv_filt_raw_wide_mod))
+
+mic_asv_filt_rarefied = t(rrarefy(t(mic_asv_filt_raw_wide_mod), mic_smallest_count))
 
 ### Microeukaryotic ASVs
 
 # Identify smallest read count
-head(sort(colSums(euk_asv_filt_raw_wide)))
+head(sort(colSums(euk_asv_filt_raw_wide_mod)))
 
 # We will remove 02_2018_F4_2 based on lack of data and rarefy samples to the
 # next lowest read count
-euk_asv_filt_raw_mod = subset(euk_asv_filt_raw_wide, select=-c(`02_2018_F4_2`))
-euk_smallest_count <- min(colSums(euk_asv_filt_raw_mod))
+euk_asv_filt_raw_wide_mod_subset = subset(euk_asv_filt_raw_wide_mod, select=-c(`02_2018_F4_2`))
+euk_smallest_count <- min(colSums(euk_asv_filt_raw_wide_mod_subset))
 
-euk_asv_filt_rarefied = t(rrarefy(t(euk_asv_filt_raw_mod), euk_smallest_count))
+euk_asv_filt_rarefied = t(rrarefy(t(euk_asv_filt_raw_wide_mod_subset), euk_smallest_count))
 
 ### Create relative abundance tables from rarefied data
 mic_asv_filt_rarefied_rel = 
@@ -133,21 +134,21 @@ euk_asv_filt_rel_mod = subset(euk_asv_filt_rel, select=-c(`02_2018_F4_2`))
 ### Export tables
 
 write.table(mic_asv_filt_raw_wide,
-            file="RAS_F4_MIC_ASV_filt_raw.txt", sep="\t", row.names = F, quote = F)
+            file=paste0(output_tables,"FRAM_RAS_F4_MIC_ASV_filt_raw.txt"), sep="\t", row.names = F, quote = F)
 write.table(mic_asv_filt_rel,
-            file="RAS_F4_MIC_ASV_filt_rel.txt", sep="\t", row.names = F, quote = F)
-write.table(euk_asv_filt_raw_mod,
-            file="RAS_F4_EUK_ASV_filt_raw.txt", sep="\t", row.names = F, quote = F)
+            file=paste0(output_tables,"FRAM_RAS_F4_MIC_ASV_filt_rel.txt"), sep="\t", row.names = F, quote = F)
+write.table(euk_asv_filt_raw_wide,
+            file=paste0(output_tables,"FRAM_RAS_F4_EUK_ASV_filt_raw.txt"), sep="\t", row.names = F, quote = F)
 write.table(euk_asv_filt_rel_mod,
-            file="RAS_F4_EUK_ASV_filt_rel.txt", sep="\t", row.names = F, quote = F) 
+            file=paste0(output_tables,"FRAM_RAS_F4_EUK_ASV_filt_rel.txt"), sep="\t", row.names = F, quote = F) 
 write.table(mic_asv_filt_rarefied,
-            file="RAS_F4_MIC_ASV_filt_rare_raw.txt", sep="\t", row.names = F, quote = F)
+            file=paste0(output_tables,"FRAM_RAS_F4_MIC_ASV_filt_rare_raw.txt"), sep="\t", row.names = F, quote = F)
 write.table(euk_asv_filt_rarefied,
-            file="RAS_F4_EUK_ASV_filt_rare_raw.txt", sep="\t", row.names = F, quote = F)
+            file=paste0(output_tables,"FRAM_RAS_F4_EUK_ASV_filt_rare_raw.txt"), sep="\t", row.names = F, quote = F)
 write.table(mic_asv_filt_rarefied_rel,
-            file="RAS_F4_MIC_ASV_filt_rare_rel.txt", sep="\t", row.names = F, quote = F)
+            file=paste0(output_tables,"FRAM_RAS_F4_MIC_ASV_filt_rare_rel.txt"), sep="\t", row.names = F, quote = F)
 write.table(euk_asv_filt_rarefied_rel,
-            file="RAS_F4_EUK_ASV_filt_rare_rel.txt", sep="\t", row.names = F, quote = F)
+            file=paste0(output_tables,"FRAM_RAS_F4_EUK_ASV_filt_rare_rel.txt"), sep="\t", row.names = F, quote = F)
 
 #####
 
@@ -163,9 +164,9 @@ euk_asv_taxa_filt =
 
 # Export tables 
 write.table(mic_asv_taxa_filt,
-            file="RAS_F4_MIC_ASV_filt_taxa.txt", sep="\t")
+            file=paste0(output_tables,"FRAM_RAS_F4_MIC_ASV_filt_taxa.txt"), sep="\t", quote=F, row.names=F)
 write.table(euk_asv_taxa_filt,
-            file="RAS_F4_EUK_ASV_filt_taxa.txt", sep="\t")
+            file=paste0(output_tables,"FRAM_RAS_F4_EUK_ASV_filt_taxa.txt"), sep="\t",quote=F, row.names=F)
 
 #####
 
@@ -173,48 +174,47 @@ write.table(euk_asv_taxa_filt,
 
 # Import gene cluster profile
 gene_raw_abund=read.csv(
-  file="FRAM_RAS_F4_proteins_all_clust_rep_abund.txt",
+  file="FRAM_RAS_F4_GENE_CLUST_raw_wide.txt",
   sep="\t",check.names=F, header=T)
 
 # Import information on the number of genomes sequenced in each metagenome
 num_genomes=read.csv(
-  file="data_files/FRAM_RAS_F4_num_genomes.txt",
-  sep="\t",check.names=F, header=T) %>%
-  mutate(Sample = gsub("_","-",Sample_name))
+  file="FRAM_RAS_F4_num_genomes.txt",
+  sep="\t",check.names=F, header=T)
 
 # Remove genes detected in less than 3 samples
-tmp = gene_raw_abund %>%
-    aggregate(Count~Gene_rep, data=., FUN=sum) %>%
-    filter(., Count >= 3)
+gene_names = gene_raw_abund %>%
+  tibble::column_to_rownames(., var="clustID") %>%
+  mutate(across(where(is.numeric), function(x) ifelse(x < 3, 0, x))) %>%
+  mutate(across(where(is.numeric), function(x) ifelse(x >= 3, 1, x))) %>%
+  mutate(sums = rowSums(.)) %>%
+  filter(sums >= 3) %>%
+  tibble::rownames_to_column(., var="Gene_clustID") %>%
+  select(Gene_clustID)
 
-# Filter gene abund table and normalise gene counts by the number of genomes sequenced
-gene_filt_raw_and_norm = gene_raw_abund %>%
-    filter(., Gene_rep %in% tmp$Gene_rep) %>%
-    left_join(num_genomes, by="Sample") %>%
-    mutate(Norm_count = Count/Num_genomes) %>%
-    mutate(Gene_clustID = paste0("geneclust_",row_number(.)))
+# Filter gene count table 
+gene_filt_raw_wide = gene_raw_abund %>%
+  filter(clustID %in% gene_names$Gene_clustID) %>%
+  rename(Gene_clustID = clustID)
 
-# Now create a wide format raw abundance table, relative abundance table and normalised count table
-gene_filt_raw_wide = gene_filt_raw_and_norm %>%
-    select(Gene_clustID,Sample_name,Count) %>%
-    dcast(Gene_clustID~Sample_name, value.var="Count") %>%
-    replace(., is.na(.), 0)
+# Normalise gene counts by the number of genomes sequenced in each sample
+gene_filt_norm_wide = 
+  gene_filt_raw_wide %>%
+  reshape2::melt(., id.vars="Gene_clustID", variable.name="Sample_name", value.name="Count") %>%
+  left_join(num_genomes, by="Sample_name") %>%
+  mutate(Norm_count = Count/Num_genomes) %>%
+  select(-Count,-Num_genomes) %>%
+  reshape2::dcast(Gene_clustID~Sample_name, value.var="Norm_count", data=.) %>%
+  replace(., is.na(.), 0)
 
-gene_filt_norm_wide = gene_filt_raw_and_norm %>%
-    select(Gene_clustID,Sample_name,Norm_count) %>%
-    dcast(Gene_clustID~Sample_name, value.var="Norm_count") %>%
-    replace(., is.na(.), 0)
-
+# Create relative abundance table from normalised counts
 gene_filt_rel_wide = 
-    gene_filt_raw_wide %>%
+    gene_filt_norm_wide %>%
     tibble::column_to_rownames(., var="Gene_clustID") %>%
     decostand(., method = "total", MARGIN=2) %>%
     tibble::rownames_to_column(., var="Gene_clustID")
 
-
 ### Export tables
-
-write.table(gene_filt_raw_wide_renamed, file="output_files/gene_clustering/FRAM_RAS_F4_proteins_all_clust_rep_filt_raw_wide.txt", row.names=F, quote=F)
-write.table(gene_filt_norm_wide_renamed, file="output_files/gene_clustering/FRAM_RAS_F4_proteins_all_clust_rep_filt_norm_wide.txt", row.names=F, quote=F)
-write.table(gene_filt_rel_wide_renamed, file="output_files/gene_clustering/FRAM_RAS_F4_proteins_all_clust_rep_filt_rel_wide.txt", row.names=F, quote=F)
-
+write.table(gene_filt_raw_wide, file=paste0(output_tables,"FRAM_RAS_F4_GENE_CLUST_filt_raw_wide.txt"), sep="\t", row.names=F, quote=F)
+write.table(gene_filt_norm_wide, file=paste0(output_tables,"FRAM_RAS_F4_GENE_CLUST_filt_norm_wide.txt"), sep="\t", row.names=F, quote=F)
+write.table(gene_filt_rel_wide, file=paste0(output_tables,"FRAM_RAS_F4_GENE_CLUST_filt_rel_wide.txt"), sep="\t", row.names=F, quote=F)
