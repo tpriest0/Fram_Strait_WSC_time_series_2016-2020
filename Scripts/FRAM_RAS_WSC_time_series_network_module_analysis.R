@@ -9,10 +9,9 @@
 ### Define working directory
 setwd('XXXXX')
 
-output_tables <- ('output_tables')
-output_figures <- ('output_figures')
-dir.create(output_tables)
-dir.create(output_figures)
+### Define and create output directories
+output_figures = ('results/figures/')
+output_tables = ('results/tables/')
 
 ### Load libraries
 library(dplyr)
@@ -27,118 +26,76 @@ library(stringr)
 library(vegan)
 library(tibble)
 library(Hmisc)
+library(tidytext)
+library(ggdendro)
+library(dendextend)
+library(igraph)
+library(tidyr)
+library(ggstatsplot)
+
+options(scipen=999)
 
 ### Import data
-# Import prokaryotic ASV relative abundance data
-mic_asv_rel=read.table(file="RAS_F4_MIC_ASV_filt_rel.txt", sep="\t",
-                       check.names=F, header=T, row.names=1) %>%
-  tibble::rownames_to_column(., var="nodeId")
 
-# Import ASV and gene network cluster assignments
-net_mod_components=
-  read.table(file="RAS_F4_NET_MOD_assignments.txt",
-                    sep="\t", check.names=F, header=T)
+# Import Prokaryotic ASV data
+mic_asv_rel=read.table(file=paste0(output_tables,"FRAM_RAS_F4_MIC_ASV_filt_rel.txt"), sep="\t",
+                       check.names=F, header=T, row.names=1) 
 
+mic_asv_raw=read.table(file=paste0(output_tables,"FRAM_RAS_F4_MIC_ASV_filt_raw.txt"), sep="\t",
+                       check.names=F, header=T, row.names=1) 
+
+# Import Eukaryotic ASV data
+euk_asv_rel=read.table(file=paste0(output_tables,"FRAM_RAS_F4_EUK_ASV_filt_rel.txt"), sep="\t",
+                       check.names=F, header=T, row.names=1) 
+
+euk_asv_raw=read.table(file=paste0(output_tables,"FRAM_RAS_F4_EUK_ASV_filt_raw.txt"), sep="\t",
+                       check.names=F, header=T, row.names=1) 
 
 # Import gene cluster ID to function to function ID
-clust_id_func_id_to_func=read.csv(
-  file="RAS_F4_GENES_CLUSTID_to_FUNCID_to_FUNC.txt",
+gene_to_func_to_tax=read.table(
+  file="FRAM_RAS_F4_GENE_CLUST_to_FUNC_to_taxonomy.txt",
   sep="\t",check.names=F, header=T)
 
+# Import gene cluster abundance profile
+func_osc4_rel_wide = 
+  read.table(file=paste0(output_tables,"FRAM_RAS_F4_FUNC_osc4_rel_wide.txt"),sep="\t",
+             check.names=F, header=T) 
+
 # Import function abundance profile
-mic_func_rel_wide = 
-  read.table(file="RAS_F4_MIC_OSC4_FUNC_CLUST_rel_abund_wide.txt",sep="\t",
-             check.names=F) %>%
-  tibble::rownames_to_column(., var="funcID")
+gene_osc4_raw_wide = 
+  read.table(file=paste0(output_tables,"FRAM_RAS_F4_GENE_CLUST_filt_raw_wide.txt"),sep="\t",
+             check.names=F, header=T)
 
 # Import metadata
 sample_meta = 
-  read.table(file="RAS_F4_META.txt",sep="\t",
+  read.table(file="FRAM_RAS_F4_META.txt",sep="\t",
              check.names=F, header=T)
 
+# Import eukaryotic ASV relative abundance data
+euk_asv_taxa=read.table(file=paste0(output_tables,"FRAM_RAS_F4_EUK_ASV_filt_taxa.txt"), sep="\t",
+                       check.names=F, header=T)
+
+# Import microbial ASV taxa info
+mic_asv_taxa=read.table(file=paste0(output_tables,"FRAM_RAS_F4_MIC_ASV_filt_taxa.txt"), sep="\t",
+                       check.names=F, header=T)
+
+# Import ASV and gene network cluster assignments
+net_mod_components=
+  read.table(file="FRAM_RAS_F4_NET_mod_components.txt",
+                    sep="\t", check.names=F, header=T)
+                    
+# Import module node connections
+net_mod_connections = read.table(file="FRAM_RAS_F4_NET_mod_connections.txt",
+                                 sep="\t", check.names=F, header=T) %>%
+                                 mutate(from = gsub("bac_","prok_",from)) %>%
+                                 mutate(to = gsub("bac_","prok_",to)) 
+
 #####
-### Firstly, combine funcID to network module with information on gene clusters to funcID
-clust_to_func_to_net_mod = 
-  clust_id_func_id_to_func %>%
-  left_join(net_mod_components, by=c("funcID" = "nodeId"))
 
-write.table(clust_to_func_to_net_mod,
-            file = "RAS_F4_GENES_CLUSTID_to_FUNCID_to_FUNC_to_MOD.txt",
-            sep="\t", row.names=F)
+### Define palettes
 
 #####
 
-##### 
-
-### Visualise the number of functional and taxonomic components in each 
-### module
-net_mod_components %>%
-  select(Module,type) %>%
-  table() %>%
-  as.data.frame()
-
-net_mod_component_counts_barplot = 
-  net_mod_components %>%
-  select(Module,type) %>%
-  table() %>%
-  as.data.frame() %>%
-  ggplot(., aes(x = type, y = Freq)) + 
-  geom_bar(aes(fill = type), stat = "identity", position = "stack") + 
-  facet_grid(.~Module, scales = "free_x") + 
-  scale_y_log10() + 
-  labs(y = "Number of components") +
-  scale_fill_manual(values = c("ASV" = "#616569",
-                               "FUNC" = "#C5C6C7")) + 
-  theme_bw() + 
-  theme(axis.text.x = element_blank(),
-        axis.title.x = element_blank(),
-        axis.text.y = element_text(size = 11),
-        axis.title.y = element_text(size = 12),
-        strip.background.x = element_rect(colour = "black",
-                                          fill = "white"),
-        strip.text.x = element_text(size = 14))
-
-# Export figure
-pdf(file = paste0(output_figures,"/FRAM_RAS_F4_MOD_component_counts_barplot.pdf"),
-    height = 5, width = 7)
-net_mod_component_counts_barplot
-dev.off()
-
-######
-
-### Determine the number of ASVs and Functions assigned to each module
-mic_asv_func_network_module_counts = 
-  net_mod_components %>%
-  select(Module, type) %>%
-  table() %>%
-  as.data.frame()
-
-### Determine the combined module relative abundance of functional components
-mic_func_module_rel_abund_long = 
-  mic_func_rel_wide %>%
-  filter(funcID %in% net_mod_components$nodeId) %>%
-  left_join(net_mod_components, by=c("funcID" = "nodeId")) %>%
-  reshape2::melt(id.vars=c("funcID","Module","type"),
-                 variable.name = "RAS_id", value.name="Rel_abund") %>%
-  aggregate(Rel_abund~Module+RAS_id, data=., FUN=sum) %>%
-  left_join(sample_meta, by="RAS_id") %>%
-  mutate(date = as.Date(date, "%d.%m.%Y")) %>%
-  mutate(Rel_abund = Rel_abund*100)
-
-### Determine the combined module relative abundance of ASV components
-mic_asv_module_rel_abund_long = 
-  mic_asv_rel %>%
-  filter(nodeId %in% net_mod_components$nodeId) %>%
-  left_join(net_mod_components, by="nodeId") %>%
-  reshape2::melt(id.vars=c("nodeId","Module","type"), 
-                 variable.name="RAS_id", value.name="Rel_abund") %>%
-  aggregate(Rel_abund~Module+type+RAS_id,
-            data=., FUN=sum) %>%
-  left_join(sample_meta, by="RAS_id") %>%
-  mutate(date = as.Date(date, "%d.%m.%Y")) %>%
-  mutate(Rel_abund = Rel_abund*100)
-
-### Visualise relative abundance dynamics of modules
 # set cluster colours for plots
 module_colours = c("M1" = "#008066",
                     "M2" = "#55DDFF",
@@ -147,88 +104,458 @@ module_colours = c("M1" = "#008066",
                     "M5" = "#490092",
                     "M6" = "#920000")
 
-# Define function for plotting modules asv and gene relative abundance
-plot_module_abund = function(infile_asv, infile_gene, text_var){
-  ggplot(data=infile_asv,
-         aes(x=as.Date(date), y=Rel_abund)) + 
-    geom_area(aes(fill = Module), alpha=0.5, show.legend=F) + 
-    geom_line(data=infile_gene, 
-              aes(x=as.Date(date), y=Rel_abund*2, colour = Module), 
+
+#####
+
+### Reformat and generate necessary tables
+
+#####
+
+### Change module numbers to reflect temporal appearance in annual cycle
+net_mod_components_mod = net_mod_components %>%
+  mutate(Module = case_when(
+    cluster == 3 ~ "M1",
+    cluster == 2 ~ "M2",
+    cluster == 1 ~ "M3",
+    cluster == 5 ~ "M4",
+    cluster == 4 ~ "M5"
+  )) %>%
+  select(nodeId,Module,type) %>%
+  mutate(type = case_when(
+        grepl("euk",type) ~ "Euk",
+        grepl("bac",type) ~ "Prok",
+        grepl("func",type) ~ "FUNC"
+    ))
+
+write.table(net_mod_components_mod,
+            file = paste0(output_tables,"FRAM_RAS_F4_NET_mod_components-renamed.txt"),
+            sep="\t", row.names=F, quote=F)
+
+### Combine funcID to network module with information on gene clusters to funcID
+net_mod_to_gene_to_func_to_tax = 
+  gene_to_func_to_tax %>%
+  left_join(net_mod_components_mod, by=c("funcID" = "nodeId"))
+
+write.table(net_mod_to_gene_to_func_to_tax,
+            file = paste0(output_tables,"FRAM_RAS_F4_NET_mod_to_gene_to_func_to_taxonomy.txt"),
+            sep="\t", row.names=F, quote=F)
+
+#####
+
+### Assess if sequencing depth has an impact on the diversity of components in modules
+
+#####
+
+### FUNCTION: rarefy the ASV count table 100 times and each time assess 
+### the number of ASVs detected in each module
+calculate_alpha_div_asv <- function(abund_table, module_mapping){
+  
+  smallest_count <- min(colSums(abund_table))
+
+  results_list <- list()
+  
+  for (i in 1:100) {
+    rarefied_abund <- t(rrarefy(t(abund_table), smallest_count))
+    
+    module_richness_df = rarefied_abund %>%
+      as.data.frame() %>%
+      tibble::rownames_to_column(., var="nodeId") %>%
+      left_join(module_mapping, by="nodeId") %>%
+      select(Module) %>%
+      filter(., Module != "NA") %>%
+      mutate(Count = 1) %>%
+      aggregate(Count~Module, data=., FUN=sum)
+    
+    results_list[[i]] <- module_richness_df
+  }
+  
+  combined_results <- bind_rows(results_list)
+  
+  summary_stats <- combined_results %>%
+    group_by(Module) %>%
+    summarise(
+      Richness_mean = mean(Count),
+      Richness_SD = sd(Count)
+    )
+  
+  return(summary_stats)
+}
+
+
+### Apply above function to prokaryotic ASV table
+module_asv_richness_results_df = calculate_alpha_div_asv(mic_asv_raw, net_mod_components_mod) %>%
+  as.data.frame() %>%
+  mutate(type = "Prok_ASV")
+
+### Apply above function to eukaryotic ASV table
+module_euk_asv_richness_results_df = calculate_alpha_div_asv(euk_asv_raw, net_mod_components_mod) %>%
+  as.data.frame() %>%
+  mutate(type = "Euk_ASV")
+
+### Repeat the same for gene clusters
+
+### FUNCTION: rarefy the gene cluster count table 100 times and each time,
+### reassign gene clusters to functions and assess the number of functions detected
+### for each module
+calculate_alpha_div_func <- function(abund_table, clust_to_func_mapping){
+  
+  smallest_count <- min(colSums(abund_table))
+
+  results_list <- list()
+  
+  for (i in 1:100) {
+    rarefied_abund <- t(rrarefy(t(abund_table), smallest_count))
+    
+    module_richness_df = rarefied_abund %>%
+        as.data.frame() %>%
+        tibble::rownames_to_column(., var="Gene_clustID") %>%
+        reshape2::melt(id.vars="Gene_clustID", variable.name="RAS_id", value.name="Count") %>%
+        left_join(clust_to_func_mapping, by="Gene_clustID") %>%
+        select(funcID,Module,RAS_id,Count) %>%
+        aggregate(Count~funcID+Module+RAS_id, FUN=sum, data=.) %>%
+        select(funcID,Module) %>%
+        unique() %>%
+        mutate(Count = 1) %>%
+        aggregate(Count~Module, data=., FUN=sum)
+    
+    results_list[[i]] <- module_richness_df
+  }
+  
+  combined_results <- bind_rows(results_list)
+  
+  summary_stats <- combined_results %>%
+    group_by(Module) %>%
+    summarise(
+      Richness_mean = mean(Count),
+      Richness_SD = sd(Count)
+    )
+  
+  return(summary_stats)
+}
+
+# Run above function
+module_func_richness_results_df = calculate_alpha_div_func(gene_osc4_raw_wide, net_mod_to_gene_to_func_to_tax) %>%
+  as.data.frame() %>%
+  mutate(type = "FUNC")
+
+### Combine richness results from ASVs and Functions
+module_comp_rare_richness = rbind(module_asv_richness_results_df,module_euk_asv_richness_results_df,module_func_richness_results_df)
+write.table(module_comp_rare_richness, file=paste0(output_tables,"FRAM_RAS_F4_NET_mod_rarefied_richness.txt"), sep="\t", quote=FALSE, row.names=FALSE)
+
+#####
+
+### Assess if the number of sampling time points has an impact on the diversity of components within modules
+
+#####
+
+# To do this, we will select one sample from each sampling month and then assess diversity of module components detected
+subset_samples = sample_meta %>%
+    arrange(month) %>%
+    group_by(month) %>%
+    slice_head(n=1) %>%
+    as.data.frame()
+
+subset_mic_asv_raw = mic_asv_raw %>%
+    select(all_of(subset_samples$RAS_id)) %>%
+    mutate(RowSum = ifelse(rowSums(.) != 0, 1, 0)) %>%
+      filter(., RowSum != 0) %>%
+      select(-RowSum)
+
+subset_euk_asv_raw = euk_asv_raw %>%
+    select(all_of(subset_samples$RAS_id)) %>%
+    mutate(RowSum = ifelse(rowSums(.) != 0, 1, 0)) %>%
+      filter(., RowSum != 0) %>%
+      select(-RowSum)
+
+subset_gene_osc4_raw_wide = gene_osc4_raw_wide %>%
+    select(all_of(subset_samples$RAS_id)) %>%
+    mutate(RowSum = ifelse(rowSums(.) != 0, 1, 0)) %>%
+      filter(., RowSum != 0) %>%
+      select(-RowSum)
+
+### Reapply rarefying and richness function from before
+module_subset_asv_richness_results_df = calculate_alpha_div_asv(subset_mic_asv_raw, net_mod_components_mod) %>%
+  as.data.frame() %>%
+  mutate(type = "Prok_ASV")
+
+module_subset_euk_asv_richness_results_df = calculate_alpha_div_asv(subset_euk_asv_raw, net_mod_components_mod) %>%
+  as.data.frame() %>%
+  mutate(type = "Euk_ASV")
+
+module_subset_func_richness_results_df = calculate_alpha_div_func(subset_gene_osc4_raw_wide, net_mod_to_gene_to_func_to_tax) %>%
+  as.data.frame() %>%
+  mutate(type = "FUNC")
+
+### Combine richness results from ASVs and Functions
+module_subset_comp_rare_richness = rbind(module_subset_asv_richness_results_df,module_subset_euk_asv_richness_results_df,module_subset_func_richness_results_df)
+write.table(module_subset_comp_rare_richness, file=paste0(output_tables,"FRAM_RAS_F4_NET_MOD_subset_and_rarefied_richness.txt"), sep="\t", quote=FALSE, row.names=FALSE)
+
+#####
+
+### Compare diversity of modules components from original data, rarefied data and reduced sampling+rarefied data
+
+#####
+
+net_mod_components_counts = net_mod_components_mod %>%
+    mutate(type = case_when(
+        type == "Prok" ~ "Prok_ASV",
+        type == "Euk" ~ "Euk_ASV",
+        type == "FUNC" ~ "FUNC"
+    )) %>%
+    select(Module,type) %>%
+    table() %>%
+    as.data.frame() %>%
+    rename(Richness_mean = Freq) %>%
+    mutate(Category = "Original data") 
+
+module_comp_rare_richness_mod = module_comp_rare_richness %>%
+    select(-Richness_SD) %>%
+    mutate(Category = "Rarefied data")
+
+module_subset_comp_rare_richness_mod = module_subset_comp_rare_richness %>%
+    select(-Richness_SD) %>%
+    mutate(Category = "Reduced samples and rarefied data")
+  
+net_mod_components_counts_all_variations = rbind(net_mod_components_counts,module_comp_rare_richness_mod,module_subset_comp_rare_richness_mod) %>%
+    mutate(type = case_when(
+        type == "Prok_ASV" ~ "ASV",
+        type == "Euk_ASV" ~ "ASV",
+        TRUE ~ "FUNC"
+    ))
+
+net_mod_components_counts_all_variations_barplot = ggplot(net_mod_components_counts_all_variations, aes(x = Module, y = Richness_mean)) + 
+    geom_bar(aes(fill = type), stat = "identity", position = "stack") + 
+    facet_grid(Category~.) + 
+    labs(y = "Number of components") +
+    scale_fill_manual(values = c("ASV" = "#004949", "FUNC" = "#b66dff")) + 
+    theme_bw() + 
+    theme(axis.text.x = element_text(size = 12),
+        axis.title.x = element_blank(),
+        axis.text.y = element_text(size = 11),
+        axis.title.y = element_text(size = 12),
+        strip.background.y = element_rect(fill = "white", colour = "black"),
+        strip.text.y = element_text(size = 10, angle=0),
+        legend.position = "bottom",
+        legend.title = element_blank())
+
+### Export plot
+pdf(file=paste0(output_figures,"FRAM_RAS_F4_NET_MOD_components_after_rarefying_and_reducing_samples_barplot.pdf"), height=8, width=8)
+net_mod_components_counts_all_variations_barplot
+dev.off()
+
+#####
+
+### Compare domain-level composition of module ASVs and functions
+
+#####
+
+### Domain-resolved module ASV counts
+
+# Raw counts
+net_mod_asv_counts = net_mod_components_mod %>%
+    filter(., type == "Prok" | 
+    type == "Euk") %>%
+    left_join(mic_asv_taxa, by=c("nodeId" = "ASV_name")) %>%
+    mutate(Domain = case_when(
+        Kingdom == "Bacteria" ~ "Bacteria",
+        Kingdom == "Archaea" ~ "Archaea",
+        TRUE ~ "Eukarya"
+    )) %>%
+    select(Module,Domain) %>%
+    mutate(count = 1) %>%
+    aggregate(count~Domain+Module, data=., FUN=sum)
+
+net_mod_asv_comp_raw_count_barplot = 
+    ggplot(net_mod_asv_counts, aes(x = Module, y = count)) + 
+    geom_bar(aes(fill = Domain), stat = "identity", position = "stack", show.legend=F) + 
+    labs(y = "Number of components") +
+    scale_fill_manual(values = c("Bacteria" = "#009292", "Archaea" = "#004949", "Eukarya" = "#ffb6db")) + 
+    theme_bw() + 
+    theme(axis.text.x = element_text(size = 12),
+        axis.title.x = element_blank(),
+        axis.text.y = element_text(size = 11),
+        axis.title.y = element_text(size = 12))
+
+# Relative proportion of total module ASV counts
+net_mod_asv_comp_rel_long =
+    net_mod_asv_counts %>%
+    dcast(Module~Domain, value.var="count") %>%
+    tibble::column_to_rownames(., var="Module") %>%
+    mutate(across(where(is.numeric), ~replace_na(., 0))) %>%
+    decostand(., method="total", MARGIN=1) %>%
+    tibble::rownames_to_column(., var="Module") %>%
+    melt(., id.vars=c("Module"), variable.name="Domain", value.name="Relative_proportion")
+
+net_mod_asv_comp_rel_barplot = ggplot(net_mod_asv_comp_rel_long, aes(x = Module, y = Relative_proportion)) + 
+    geom_bar(aes(fill = Domain), stat = "identity", position = "stack", show.legend=F) + 
+    labs(y = "Relative proportion of Module ASVs") +
+    scale_fill_manual(values = c("Bacteria" = "#009292", "Archaea" = "#004949", "Eukarya" = "#ffb6db")) + 
+    theme_bw() + 
+    theme(axis.text.x = element_text(size = 12),
+        axis.title.x = element_blank(),
+        axis.text.y = element_text(size = 11),
+        axis.title.y = element_text(size = 12))
+
+### Domain-level composition of module functions
+
+# Raw counts
+net_mod_func_domain_comp_counts_long = net_mod_to_gene_to_func_to_tax %>%
+    select(Module,Domain_tiara) %>%
+    mutate(Domain = case_when(
+        Domain_tiara == "archaea" ~ "Archaea",
+        Domain_tiara == "bacteria" ~ "Bacteria",
+        Domain_tiara == "prokarya" ~ "Undefined",
+        Domain_tiara == "organelle" ~ "Undefined",
+        Domain_tiara == "unknown" ~ "Undefined",
+        TRUE ~ "Eukarya"
+    )) %>%
+    mutate(count = 1) %>%
+    aggregate(count~Domain+Module, data=., FUN=sum)
+
+net_mod_func_domain_comp_raw_barplot = 
+    ggplot(net_mod_func_domain_comp_counts_long, aes(x = Module, y = count)) + 
+    geom_bar(aes(fill = Domain), stat = "identity", position = "stack", show.legend=F) + 
+    labs(y = "Number of gene clusters within functions") +
+    scale_fill_manual(values = c("Bacteria" = "#009292", "Archaea" = "#004949", "Eukarya" = "#ffb6db", "Undefined" = "#D9DDDC")) + 
+    theme_bw() + 
+    theme(axis.text.x = element_text(size = 12),
+        axis.title.x = element_blank(),
+        axis.text.y = element_text(size = 11),
+        axis.title.y = element_text(size = 12))
+
+# Relative proportion of total module Function counts
+net_mod_func_domain_comp_rel_long = net_mod_func_domain_comp_counts_long %>%
+    dcast(Module~Domain, value.var="count") %>%
+    tibble::column_to_rownames(., var="Module") %>%
+    decostand(., method="total", MARGIN=1) %>%
+    tibble::rownames_to_column(., var="Module") %>%
+    melt(., id.vars=c("Module"), variable.name="Domain", value.name="Relative_proportion")
+
+net_mod_func_domain_comp_rel_barplot = 
+    ggplot(net_mod_func_domain_comp_rel_long, aes(x = Module, y = Relative_proportion)) + 
+    geom_bar(aes(fill = Domain), stat = "identity", position = "stack") + 
+    labs(y = "Relative proportion of gene clusters in Module functions") +
+    scale_fill_manual(values = c("Bacteria" = "#009292", "Archaea" = "#004949", "Eukarya" = "#ffb6db", "Undefined" = "#D9DDDC")) + 
+    theme_bw() + 
+    theme(axis.text.x = element_text(size = 12),
+        axis.title.x = element_blank(),
+        axis.text.y = element_text(size = 11),
+        axis.title.y = element_text(size = 12))
+
+### Combine plots and export
+pdf(file=paste0(output_figures,"FRAM_RAS_F4_NET_MOD_ASV_and_FUNC_domain_composition_raw_count_barplot.pdf"), height=6, width=8)
+net_mod_asv_comp_raw_count_barplot+net_mod_func_domain_comp_raw_barplot
+dev.off()
+
+pdf(file=paste0(output_figures,"FRAM_RAS_F4_NET_MOD_ASV_and_FUNC_domain_composition_relative_barplot.pdf"), height=6, width=8)
+net_mod_asv_comp_rel_barplot+net_mod_func_domain_comp_rel_barplot
+dev.off()
+
+######
+
+### Visualize the temporal dynamics of modules
+
+#####
+
+### Determine the combined relative abundance of module components
+func_module_rel_abund_long = 
+  func_osc4_rel_wide %>%
+  filter(funcID %in% net_mod_components_mod$nodeId) %>%
+  left_join(net_mod_components_mod, by=c("funcID" = "nodeId")) %>%
+  reshape2::melt(id.vars=c("funcID","Module","type"),
+                 variable.name = "Sample_name", value.name="Rel_abund") %>%
+  aggregate(Rel_abund~Module+Sample_name, data=., FUN=sum) %>%
+  left_join(sample_meta, by=c("Sample_name" = "MG_sample_names"))%>%
+  mutate(date = as.Date(date, "%d.%m.%Y")) %>%
+  mutate(Rel_abund = Rel_abund*100) %>%
+  mutate(Type = "FUNC") %>%
+  select(Module,RAS_id,Rel_abund,Type,date,year,month,depth,daylight,temp,sal,O2_conc,Chl_a,CO2,pH,PAR_satellite,MLD)
+
+mic_asv_module_rel_abund_long = 
+    mic_asv_rel %>%
+    tibble::rownames_to_column(., var="nodeId") %>%
+    filter(nodeId %in% net_mod_components_mod$nodeId) %>%
+    left_join(net_mod_components_mod, by="nodeId") %>%
+    reshape2::melt(id.vars=c("nodeId","Module","type"),
+                 variable.name = "RAS_id", value.name="Rel_abund") %>%
+    aggregate(Rel_abund~Module+RAS_id, data=., FUN=sum) %>%
+    left_join(sample_meta, by="RAS_id")%>%
+    mutate(date = as.Date(date, "%d.%m.%Y")) %>%
+    mutate(Rel_abund = Rel_abund*100) %>%
+    mutate(Type = "PROK_ASV") %>%
+    select(Module,RAS_id,Rel_abund,Type,date,year,month,depth,daylight,temp,sal,O2_conc,Chl_a,CO2,pH,PAR_satellite,MLD)
+
+euk_asv_module_rel_abund_long = 
+    euk_asv_rel %>%
+    tibble::rownames_to_column(., var="nodeId") %>%
+    filter(nodeId %in% net_mod_components_mod$nodeId) %>%
+    left_join(net_mod_components_mod, by="nodeId") %>%
+    reshape2::melt(id.vars=c("nodeId","Module","type"),
+                 variable.name = "RAS_id", value.name="Rel_abund") %>%
+    aggregate(Rel_abund~Module+RAS_id, data=., FUN=sum) %>%
+    left_join(sample_meta, by="RAS_id")%>%
+    mutate(date = as.Date(date, "%d.%m.%Y")) %>%
+    mutate(Rel_abund = Rel_abund*100) %>%
+    mutate(Type = "EUK_ASV") %>%
+    select(Module,RAS_id,Rel_abund,Type,date,year,month,depth,daylight,temp,sal,O2_conc,Chl_a,CO2,pH,PAR_satellite,MLD)
+
+asv_module_rel_abund_long = rbind(mic_asv_module_rel_abund_long,euk_asv_module_rel_abund_long)
+
+### Visualise relative abundance dynamics of modules
+
+module_temporal_dynamics = ggplot(data=asv_module_rel_abund_long,
+         aes(x=as.Date(date), y=Rel_abund, fill=Type)) + 
+    geom_area(aes(fill = Type), position="stack", colour="black", alpha=0.5, show.legend=F) + 
+    geom_line(data=func_module_rel_abund_long, aes(x=as.Date(date), y=Rel_abund*5, colour = Module), 
               linewidth=1, show.legend=F) +
-    geom_point(data=infile_gene, 
-               aes(x=as.Date(date), y=Rel_abund*2, colour = Module), 
+    geom_point(data=func_module_rel_abund_long, aes(x=as.Date(date), y=Rel_abund*5), shape = 24, size = 2, 
                show.legend=F) +
     scale_x_date(date_breaks = "6 months", date_labels =  "%b %Y") +
     scale_y_continuous(sec.axis = 
-                         sec_axis(~./2, name="Cluster genes relative abundance (%)")) + 
-    scale_fill_manual(values = module_colours) + 
+                         sec_axis(~./5, name="Cluster genes relative abundance (%)")) + 
+    #scale_fill_manual(values = module_colours) + 
     scale_colour_manual(values = module_colours) + 
-    labs(y = "Relative abundance (%)",
-         title = text_var) + 
+    facet_grid(Module~., scales="free_y") + 
+    labs(y = "Relative abundance (%)") + 
     theme_bw() + 
     theme(axis.text.x = element_blank(),
           axis.text.y = element_text(size = 12),
           axis.title.y = element_blank(),
           axis.title.x = element_blank(),
-          plot.background = element_blank())
-}
-
-# specify code to remove x-axis labels for plots (prevents repeated axes when stacking plots)
-remove_x_axis <- theme(
-  axis.text.x = element_blank(),
-  axis.title.x = element_blank()
-)
-
-
-### Split the gene and asv module relative abundance dataframe by cluster
-mic_asv_module_rel_abund_long_split = 
-  split(mic_asv_module_rel_abund_long,mic_asv_module_rel_abund_long$Module)
-mic_func_module_rel_abund_long_split = 
-  split(mic_func_module_rel_abund_long,mic_func_module_rel_abund_long$Module)
-
-### Create the plots for each cluster
-net_module_M1_dynamics = plot_module_abund(mic_asv_module_rel_abund_long_split$M1,
-                                           mic_func_module_rel_abund_long_split$M1, 
-                                           "M1 (early polar night): 153 ASVs, 2165 Functional genes")
-net_module_M2_dynamics = plot_module_abund(mic_asv_module_rel_abund_long_split$M2,
-                                           mic_func_module_rel_abund_long_split$M2,
-                                           "M2 (late polar night): 244 ASVs, 1778 Functional genes")
-net_module_M3_dynamics = plot_module_abund(mic_asv_module_rel_abund_long_split$M3,
-                                           mic_func_module_rel_abund_long_split$M3,
-                                           "M3 (spring): 66 ASVs, 3140 Functional genes")
-net_module_M4_dynamics = plot_module_abund(mic_asv_module_rel_abund_long_split$M4,
-                                           mic_func_module_rel_abund_long_split$M4,
-                                           "M4 (summer): 135 ASVs, 3078 Functional genes")
-net_module_M5_dynamics = plot_module_abund(mic_asv_module_rel_abund_long_split$M5,
-                                           mic_func_module_rel_abund_long_split$M5,
-                                           "M5 (autumn): 60 ASVs, 1159 Functional genes")
+          plot.background = element_blank(),
+          strip.background = element_blank(),
+          strip.text = element_blank())
 
 ### Combine all plots and export
 library(patchwork)
-pdf(file=paste0(output_figures,"/FRAM_RAS_F4_MOD_temporal_dynamics.pdf"),
+pdf(file=paste0(output_figures,"FRAM_RAS_F4_NET_mod_temporal_dynamics.pdf"),
     height=10, width=8)
-(net_module_M1_dynamics+remove_x_axis)/(net_module_M2_dynamics+remove_x_axis)/
-  (net_module_M3_dynamics+remove_x_axis)/(net_module_M4_dynamics+remove_x_axis)/
-  net_module_M5_dynamics
+module_temporal_dynamics
 dev.off()
 
 ### Export module ASV and gene abundance tables
-write.table(mic_func_module_rel_abund_long,
-            file="RAS_F4_NET_MOD_FUNC_relative_abundance.txt", sep="\t",
+write.table(func_module_rel_abund_long,
+            file=paste0(output_tables,"FRAM_RAS_F4_NET_mod_FUNC_relative_abundance.txt"), sep="\t",
             quote = F, row.names = F)
 
 write.table(mic_asv_module_rel_abund_long,
-            file="RAS_F4_NET_MOD_ASV_relative_abundance.txt", sep="\t",
+            file=paste0(output_tables,"FRAM_RAS_F4_NET_mod_ASV_relative_abundance.txt"), sep="\t",
             quote = F, row.names = F)
 
+
+temp1= func_module_rel_abund_long %>%
+  select(Module,RAS_id,Rel_abund) %>%
+  arrange(Module,RAS_id)
+temp1
 
 ### ALTERNATIVE VISUALISATION:
 ### area graphs to better illustrate successional dynamics of module ASVs and module
 ### functions 
 
-
-pdf(file=paste0(output_figures,"/FRAM_RAS_F4_MOD_ASV_only_temporal_dynamics_area_nonstacked.pdf"),
+pdf(file=paste0(output_figures,"FRAM_RAS_F4_NET_mod_ASV_only_temporal_dynamics_area_nonstacked.pdf"),
     height=6, width=8)
+
+    
 mic_asv_module_rel_abund_long %>%
   mutate(Module = factor(Module, levels = c("M3","M4","M2","M1","M6","M5"))) %>%
   ggplot(data=.,
@@ -245,7 +572,7 @@ mic_asv_module_rel_abund_long %>%
         plot.background = element_blank())
 dev.off()  
 
-pdf(file=paste0(output_figures,"/FRAM_RAS_F4_MOD_function_only_temporal_dynamics.pdf"),
+pdf(file=paste0(output_figures,"FRAM_RAS_F4_NET_mod_function_only_temporal_dynamics.pdf"),
     height=6, width=8)
 mod_functional_temporal_area_plot = 
   mic_func_module_rel_abund_long %>%
@@ -265,20 +592,12 @@ mod_functional_temporal_area_plot =
 mod_functional_temporal_area_plot
 dev.off()  
 
-### Create dataframe with module ASV and Func abundance over time
-mod_list <- c("M1","M2","M3","M4","M5")
-mod_asv_list <-c("M1_asv","M2_asv","M3_asv","M4_asv","M5_asv")
-names(mic_asv_module_rel_abund_long_split) <- mod_asv_list
-list2env(mic_asv_module_rel_abund_long_split,envir=.GlobalEnv)
+###############
 
-mod_gen_list <-c("M1_function","M2_function","M3_function","M4_function","M5_function")
-names(mic_func_module_rel_abund_long_split) <- mod_gen_list
-list2env(mic_func_module_rel_abund_long_split,envir=.GlobalEnv)
+##### What are the factors driving module dynamics?
 
-refine_mod_df <- function(x){
-  mic_asv_module_rel_abund_long_split$x %>%
-    filter(Module,Type,RAS_id,Rel_abund)
-}
+# First let's filter our metadata table to continuous variables and zero-mean variance
+# standardize them
 
 ###############
 
@@ -361,7 +680,6 @@ module_asv_func_vs_env_sig_cor_df =
       M1_func_env_cor_sig_df, M2_func_env_cor_sig_df, M3_func_env_cor_sig_df,
       M4_func_env_cor_sig_df, M5_func_env_cor_sig_df)
 
-
 ### Now we want to calculate and add in the confidence intervals for our
 ### coefficients with a p-value < 0.05
 
@@ -392,9 +710,7 @@ for (i in 1:nrow(module_asv_func_vs_env_sig_cor_df)) {
 module_asv_func_vs_env_sig_cor_df$ci_lower <- ci_lower
 module_asv_func_vs_env_sig_cor_df$ci_upper <- ci_upper
 
-
 ### Visualise the significant correlations
-
 net_mod_env_sig_corr_heatmap = 
   ggplot(module_asv_func_vs_env_sig_cor_df, aes(y=Type, x=column)) +
   geom_tile(aes(fill=cor)) + 
@@ -413,46 +729,14 @@ net_mod_env_sig_corr_heatmap =
         strip.background = element_blank(),
         strip.text = element_blank())
 
-pdf(file=paste0(output_figures,"/RAS_F4_MOD_env_corr_heatmap.pdf"),
+pdf(file=paste0(output_figures,"FRAM_RAS_F4_MOD_env_corr_heatmap.pdf"),
     width = 8, height = 10)
 net_mod_env_sig_corr_heatmap
 dev.off()
 
 ### Export correlation table
 write.table(module_asv_func_vs_env_sig_cor_df,
-            file=paste0(output_tables,"/RAS_F4_MOD_ASV_FUNC_vs_env_cor_results.txt"), sep="\t")
-
-
-
-################ 
-
-#####
-
-### This section is completely optional!
-### It creates and outputs a table for each module that contains only the kegg ko
-### information. These files can directly be uploaded to kegg mapper to explore
-### metabolic maps
-
-# Filter above table to only include functions with KEGG annotation in preparation for 
-# gene enrichment analysis
-kegg_func_modules = 
-  clust_to_func_to_net_mod %>%
-  select(Module,funcID,FUNC) %>%
-  filter(., grepl("^ko",FUNC)) %>%
-  mutate(FUNC = gsub("ko:","",FUNC)) %>%
-  select(Module,FUNC) 
-
-for (modulename in c("M1","M2","M3","M4","M5")){
-  name_out <- paste(modulename, "_kegg_only", sep = "")
-  
-  assign(name_out, kegg_func_modules %>%
-                      filter(Module == modulename) %>%
-           unique)
-}
-
-write.table(M5_kegg_only,
-            file="Network_analysis/FRAM_RAS_F4_NET_MOD_M5_kegg_only.txt",
-            sep="\t")
+            file=paste0(output_tables,"FRAM_RAS_F4_NET_mod_ASV_FUNC_vs_env_cor_results.txt"), sep="\t")
 
 
 #######################
@@ -460,214 +744,181 @@ write.table(M5_kegg_only,
 ###### Examine the content of modules
 ###### in terms of microbial and functional composition
 
-######
-library(tidytext)
-library(ggdendro)
-library(dendextend)
-library(igraph)
-library(tidyverse)
-library(tidyr)
-library(ggstatsplot)
-
-### import necessary files
-options(scipen=999)
+#######################
 
 ### MODULE TAXONOMIC COMPOSITION
 
-# Import module to asv info
-net_mod_components=read.table(
-  file="RAS_F4_NET_MOD_assignments.txt", sep="\t",
-  check.names=F, header=T)
+### FUNCTION: Create dataframe with the 10 ASVs reaching the highest relative abundances in each module
 
-# Import microbial ASV relative abundance data
-mic_asv_rel=read.table(file="RAS_F4_MIC_ASV_filt_rel.txt", sep="\t",
-                       check.names=F, header=T)
-
-# Import microbial ASV taxa info
-mic_asv_taxa=read.table(file="RAS_F4_MIC_ASV_filt_taxa.txt", sep="\t",
-                       check.names=F, header=T)
-
-# Import module node connections
-net_mod_connections = read.table(file="RAS_F4_NET_MOD_node_weights_and_pvals.txt",
-                                 sep="\t", check.names=F, header=T)
-
-#####
+identify_top10_asvs <- function(net_mod_components_mod, domain, asv_rel_abund, asv_taxa){
+  net_mods_to_asv = net_mod_components_mod %>%
+    filter(., grepl(domain, nodeId)) %>%
+    select(Module,nodeId)
   
-### Identify most dominant ASVs in modules
-# filter net module components table for ASVs
-net_mods_to_asv <- net_mod_components %>%
-  filter(., grepl("prok_", nodeId)) %>%
-  select(Module,nodeId)
+  asv_rel_long = asv_rel_abund %>%
+    tibble::rownames_to_column(., var="ASV_name") %>%
+    melt(., variable.name = "RAS_id", value.name = "Rel_abund")
 
-# Create long format relative abundance table
-mic_asv_rel_long = mic_asv_rel %>%
-  melt(., variable.name = "RAS_id", value.name = "Rel_abund")
+  net_mod_top10_abund_asvs =
+    net_mods_to_asv %>%
+    left_join(asv_taxa, by=c("nodeId" = "ASV_name")) %>%
+    left_join(asv_rel_long, by=c("nodeId" = "ASV_name")) %>%
+    aggregate(Rel_abund~nodeId+Genus+Module, data=., FUN=max) %>%
+    group_by(Module) %>%
+    arrange(desc(Rel_abund)) %>%
+    slice_head(n=10) %>%
+    as.data.frame() %>%
+    mutate(Rel_abund = Rel_abund*100) %>%
+    mutate(ASV_genus = paste0(Genus," - ",nodeId)) %>%
+    arrange(Module,desc(Rel_abund)) %>%
+    mutate(ASV_genus = factor(ASV_genus, levels=unique(ASV_genus)))
 
-# Identify top 10 most abundant ASVs in each module
-net_mod_top10_abund_asvs =
-  net_mods_to_asv %>%
-  left_join(mic_asv_taxa, by=c("nodeId" = "ASV_name")) %>%
-  left_join(mic_asv_rel_long, by=c("nodeId" = "ASV_name")) %>%
-  aggregate(Rel_abund~nodeId+Genus+Module, data=., FUN=max) %>%
-  group_by(Module) %>%
-  arrange(desc(Rel_abund)) %>%
-  slice_head(n=10) %>%
-  as.data.frame() %>%
-  mutate(Rel_abund = Rel_abund*100) %>%
-  mutate(nodeId = factor(nodeId, levels = unique(nodeId))) %>%
-  mutate(ASV_genus = paste0(Genus," - ",nodeId))
+  return(net_mod_top10_abund_asvs)
+}
 
-# Assess how many connections these ASVs have in the network to other ASVs and to
-# functions within the same module. Importantly, we will divide the number of 
-# edges by the number of nodes in each module
+net_mod_top10_mic_asvs = identify_top10_asvs(net_mod_components_mod, "prok", mic_asv_rel, mic_asv_taxa)
+net_mod_top10_euk_asvs = identify_top10_asvs(net_mod_components_mod, "euk", euk_asv_rel, euk_asv_taxa)
 
-# First create table with number of nodes per module
-net_mod_node_counts = 
-  net_mod_components %>%
-  select(Module,type) %>%
-  table() %>%
-  as.data.frame()
+### FUNCTION: create a dataframe containing information on the number of connections that the top10 asvs have within the module, normalised by the 
+### total number of connections in that module
 
-# Now create a table containing the top ten most abundant ASVs and the number
-# of connections they have to other ASVs and functions. Also normalise the 
-# number of connections based upon the number of components in the respective module
-net_mod_top10_abund_asv_connections = 
-  net_mod_connections %>%
-  filter(., from %in% net_mod_top10_abund_asvs$nodeId) %>%
-  left_join(net_mod_components, by=c("to" = "nodeId"))  %>%
-  rename(., Module_to = Module) %>%
-  select(from,Module_to,type) %>%
-  mutate(count = 1) %>%
-  aggregate(count~from+Module_to+type, data=., FUN=sum) %>%
-  left_join(net_mod_top10_abund_asvs, by=c("from" = "nodeId")) %>%
-  rename(., "Module_from" = "Module") %>%
-  rename(., nodeId = from) %>%
-  select(nodeId,Genus,ASV_genus,Rel_abund,Module_from,Module_to,type,count) %>%
-  arrange(Module_from,desc(Rel_abund)) %>%
-  left_join(net_mod_node_counts, by=c("Module_to" = "Module", "type")) %>%
-  mutate(norm_count = count/Freq) %>%
-  select(-Freq)
+identify_top10_asvs_connections <- function(net_mod_components_mod, net_mod_connections, top10_asvs){
+  net_mod_node_counts = 
+    net_mod_components_mod %>%
+    select(Module,type) %>%
+    table() %>%
+    as.data.frame()
+  
+  p1 = net_mod_connections %>%
+    filter(., from %in% top10_asvs$nodeId) %>%
+    rename(node_one = from) %>%
+    rename(node_two = to)
 
-# Filter connections to include only those within the same module
-net_mod_top10_abund_asv_connections_within_mod = 
-  net_mod_top10_abund_asv_connections %>%
-  filter(Module_from == Module_to) %>%
-  mutate(ASV_genus = factor(ASV_genus, levels=unique(ASV_genus)))
+  p2 = net_mod_connections %>%
+    filter(., to %in% top10_asvs$nodeId) %>%
+    rename(node_one = to) %>%
+    rename(node_two = from)
+  
+  net_mod_top10_abund_asv_connections = 
+    rbind(p1,p2) %>%
+    select(node_one,node_two) %>%
+    unique() %>%
+    left_join(net_mod_components_mod, by=c("node_two" = "nodeId")) %>%
+    rename(., Module_to = Module) %>%
+    select(node_one,Module_to,type) %>%
+    mutate(count = 1) %>%
+    aggregate(count~node_one+Module_to+type, data=., FUN=sum) %>%
+    left_join(top10_asvs, by=c("node_one" = "nodeId")) %>%
+    filter(., Module == Module_to) %>%
+    rename(., nodeId = node_one) %>%
+    select(nodeId,Module,ASV_genus,Rel_abund,type,count) %>%
+    left_join(net_mod_node_counts, by=c("Module", "type")) %>%
+    mutate(norm_count = count/Freq) %>%
+    select(-Freq) %>%
+    arrange(Module,desc(Rel_abund)) %>%
+    mutate(ASV_genus = factor(ASV_genus, levels=unique(ASV_genus)))
+  
+  return(net_mod_top10_abund_asv_connections)
+}
 
-### Visualise
-module_colours = c("M1" = "#008066",
-                   "M2" = "#55DDFF",
-                   "M3" = "#FFB300",
-                   "M4" = "#F55BF5",
-                   "M5" = "#490092",
-                   "M6" = "#920000")
+net_mod_top10_mic_asvs_connections <- identify_top10_asvs_connections(net_mod_components_mod, net_mod_connections, net_mod_top10_mic_asvs)
+net_mod_top10_euk_asvs_connections <- identify_top10_asvs_connections(net_mod_components_mod, net_mod_connections, net_mod_top10_euk_asvs)
 
-net_mod_top10_asv_max_abund_barplot = 
-  ggplot(data=net_mod_top10_abund_asv_connections_within_mod, 
-       aes(x = Rel_abund, y = ASV_genus)) + 
-  geom_bar(aes(fill = Module_from), stat="identity", position="identity", show.legend=F) +
-  scale_fill_manual(values = module_colours) + 
-  scale_y_discrete(limits=rev) + 
-  facet_wrap(Module_from~., scales="free_y", ncol = 1, nrow = 6) +
-  labs(x = "Maximum relative abundance (%)") + 
-  theme_bw() + 
-  theme(strip.background.x = element_blank(),
-        strip.text.x = element_blank(),
-        axis.text.x = element_text(size = 11),
-        axis.text.y = element_text(size = 11),
-        axis.title.x = element_text(size = 12),
-        axis.title.y = element_blank(),
-        legend.title = element_text(size = 12),
-        legend.text = element_text(size = 12))
+### FUNCTION: Create figure summarising most abundant asvs and their connections to other asvs and functions in the module
+visualise_top10_asvs_and_connections <- function(top10_asvs, top10_asvs_connections){
+     top10_asv_max_abund = 
+          ggplot(data=top10_asvs, 
+               aes(x = Rel_abund, y = ASV_genus)) + 
+          geom_bar(aes(fill = Module), stat="identity", position="identity", show.legend=F) +
+          scale_fill_manual(values = module_colours) + 
+          scale_y_discrete(limits=rev) + 
+          facet_wrap(Module~., scales="free_y", ncol = 1, nrow = 6) +
+          labs(x = "Maximum relative abundance (%)") + 
+          theme_bw() + 
+          theme(strip.background.x = element_blank(),
+               strip.text.x = element_blank(),
+               axis.text.x = element_text(size = 11),
+               axis.text.y = element_text(size = 11),
+               axis.title.x = element_text(size = 12),
+               axis.title.y = element_blank(),
+               legend.title = element_text(size = 12),
+               legend.text = element_text(size = 12))
+     
+     top10_asv_prok_connections = 
+          top10_asvs_connections %>%
+          filter(., type == "Prok") %>%
+          ggplot(data=., aes(x = norm_count, y = ASV_genus)) + 
+          geom_bar(fill="#D9DDDC", stat="identity", position="identity", show.legend=F) + 
+          facet_wrap(Module~., scales="free_y", ncol = 1, nrow = 6) + 
+          theme_bw() + 
+          labs(x = "Normalised num. of connections with prokaryotic ASVs in module") + 
+          scale_y_discrete(limits=rev) + 
+          theme(strip.background.x = element_blank(),
+               strip.text.x = element_blank(),
+               axis.text.y = element_blank(),
+               axis.title.y = element_blank())
 
-net_mod_top10_num_connections_with_asvs_barplot = 
-  net_mod_top10_abund_asv_connections_within_mod %>%
-  filter(., type == "ASV") %>%
-  ggplot(data=., aes(x = norm_count, y = ASV_genus)) + 
-  geom_bar(fill="#D9DDDC", stat="identity", position="identity", show.legend=F) + 
-  facet_wrap(Module_from~., scales="free_y", ncol = 1, nrow = 6) + 
-  theme_bw() + 
-  labs(x = "Normalised count of connections with other ASVs in module") + 
-  scale_y_discrete(limits=rev) + 
-  theme(strip.background.x = element_blank(),
-        strip.text.x = element_blank(),
-        axis.text.y = element_blank(),
-        axis.title.y = element_blank())
+     top10_asv_euk_connections = 
+          top10_asvs_connections %>%
+          filter(., type == "Euk") %>%
+          ggplot(data=., aes(x = norm_count, y = ASV_genus)) + 
+          geom_bar(fill="#D9DDDC", stat="identity", position="identity", show.legend=F) + 
+          facet_wrap(Module~., scales="free_y", ncol = 1, nrow = 6) + 
+          theme_bw() + 
+          labs(x = "Normalised num. of connections with eukaryotic ASVs in module") + 
+          scale_y_discrete(limits=rev) + 
+          theme(strip.background.x = element_blank(),
+               strip.text.x = element_blank(),
+               axis.text.y = element_blank(),
+               axis.title.y = element_blank())
+     
+     top10_asv_func_connections = 
+          top10_asvs_connections %>%
+          filter(., type == "FUNC") %>%
+          ggplot(data=., aes(x = norm_count, y = ASV_genus)) + 
+          geom_bar(fill="#787276", stat="identity", position="identity", show.legend=F) + 
+          facet_wrap(Module~., scales="free_y", ncol = 1, nrow = 6) + 
+          theme_bw() + 
+          labs(x = "Normalised num. of connections with functions in module") + 
+          scale_y_discrete(limits=rev) + 
+          theme(strip.background.x = element_blank(),
+               strip.text.x = element_blank(),
+               axis.text.y = element_blank(),
+               axis.title.y = element_blank())
+     
+     return(list(
+         max_abund_plot = top10_asv_max_abund,
+         prok_connections_plot = top10_asv_prok_connections,
+         euk_connections_plot = top10_asv_euk_connections,
+         func_connections_plot = top10_asv_func_connections
+     ))
+}
 
-net_mod_top10_num_connections_with_func_barplot = 
-  net_mod_top10_abund_asv_connections_within_mod %>%
-  filter(., type == "FUNC") %>%
-  ggplot(data=., aes(x = norm_count, y = ASV_genus)) + 
-  geom_bar(fill="#787276", stat="identity", position="identity", show.legend=F) + 
-  facet_wrap(Module_from~., scales="free_y", ncol = 1, nrow = 6) + 
-  theme_bw() + 
-  labs(x = "Normalised count of connections with functions in module") + 
-  scale_y_discrete(limits=rev) + 
-  theme(strip.background.x = element_blank(),
-        strip.text.x = element_blank(),
-        axis.text.y = element_blank(),
-        axis.title.y = element_blank())
+### Run function to illustrate number of connectins for top10 most abundant prokaryotic ASVs in each module, then combine figures and export
+net_mod_top10_asvs_prok_plots = visualise_top10_asvs_and_connections(net_mod_top10_mic_asvs, net_mod_top10_mic_asvs_connections)
 
-### Merge figures and export
-pdf(file = paste0(output_figures,"/FRAM_RAS_F4_MOD_most_abund_asvs_barplot.pdf"),
-    height = 10, width = 10)
-net_mod_top10_asv_max_abund_barplot+net_mod_top10_num_connections_with_asvs_barplot+
-  net_mod_top10_num_connections_with_func_barplot+plot_layout(widths=c(4,2,2))
+pdf(file = paste0(output_figures,"FRAM_RAS_F4_NET_mod_prok_most_abund_asvs_barplot.pdf"),
+    height = 8, width = 10)
+net_mod_top10_asvs_prok_plots$max_abund_plot+net_mod_top10_asvs_prok_plots$prok_connections_plot+
+  net_mod_top10_asvs_prok_plots$euk_connections_plot+net_mod_top10_asvs_prok_plots$func_connections_plot+
+  plot_layout(widths=c(4,2,2,2))
 dev.off()
 
-###
+### Run function to illustrate number of connectins for top10 most abundant eukaryotic ASVs in each module, then combine figures and export
+net_mod_top10_asvs_euk_plots = visualise_top10_asvs_and_connections(net_mod_top10_euk_asvs, net_mod_top10_euk_asvs_connections)
 
-### Identify the top 10 most abundant genera in each module
-
-# Sum ASV abundances at genus level for each sample in each module
-# Then identify the ten genera with the highest relative abundance values in 
-# each module
-net_mods_most_abund_genera = net_mods_to_asv %>%
-  left_join(mic_asv_taxa, by=c("nodeId" = "ASV_name")) %>%
-  left_join(mic_asv_rel, by=c("nodeId" = "ASV_name")) %>%
-  melt(., variable.name="RAS_id", value.name="Rel_abund") %>%
-  select(Module, Genus, RAS_id, Rel_abund) %>%
-  aggregate(Rel_abund~Genus+Module+RAS_id, data=., FUN=sum) %>%
-  aggregate(Rel_abund~Genus+Module, data=., FUN=max) %>%
-  group_by(Module) %>%
-  arrange(desc(Rel_abund)) %>%
-  slice_head(n=10) %>%
-  as.data.frame() %>%
-  mutate(Rel_abund = Rel_abund*100) %>%
-  arrange(Module,desc(Rel_abund)) %>%
-  mutate(Genus = factor(Genus, levels = unique(Genus)))
-
-# Plot maximum relative abundance of genera as barchart
-# First need to use interaction between Genus and Module to enforce the correct
-# ordering of Genus in the faceted plot
-net_mods_most_abund_genera_new <- 
-  net_mods_most_abund_genera %>%
-  arrange(Module, desc(Rel_abund)) %>%
-  mutate(Genus_Module = factor(interaction(Genus, Module), levels = unique(interaction(Genus, Module))))
-
-net_mod_most_abund_genera_bar_facet = 
-  ggplot(net_mods_most_abund_genera_new, 
-       aes(x = Rel_abund, y = Genus_Module, fill = Module)) +
-  geom_bar(stat="identity", position="identity") + 
-  scale_fill_manual(values = module_colours) + 
-  facet_grid(Module ~ ., scales = "free_y", switch = "y") +
-  labs(x = "Maximum relative abundance (%)") + 
-  theme_bw() + 
-  theme(strip.background.y = element_blank(),
-        strip.text.y = element_blank(),
-        axis.text.x = element_text(size = 11),
-        axis.text.y = element_text(size = 11),
-        axis.title.x = element_text(size = 12),
-        axis.title.y = element_blank(),
-        legend.title = element_text(size = 12),
-        legend.text = element_text(size = 12))
-
-pdf(file = paste0(output_figures,"/FRAM_RAS_F4_MOD_most_abund_genera_bar.pdf"),
-    height = 10, width = 6)
-net_mod_most_abund_genera_bar_facet
+pdf(file = paste0(output_figures,"FRAM_RAS_F4_NET_mod_euk_most_abund_asvs_barplot.pdf"),
+    height = 8, width = 10)
+net_mod_top10_asvs_euk_plots$max_abund_plot+net_mod_top10_asvs_euk_plots$prok_connections_plot+
+  net_mod_top10_asvs_euk_plots$euk_connections_plot+net_mod_top10_asvs_euk_plots$func_connections_plot+
+  plot_layout(widths=c(4,2,2,2))
 dev.off()
 
-
+### Create figure just illustrating relative abundance of top10 asvs of prokaryotes and eukaryotes
+pdf(file = paste0(output_figures,"FRAM_RAS_F4_NET_mod_prok_and_euk_most_abund_asvs_barplot.pdf"),
+    height = 8, width = 10)
+net_mod_top10_asvs_prok_plots$max_abund_plot+net_mod_top10_asvs_euk_plots$max_abund_plot
+dev.off()
 
 
 ################
@@ -693,17 +944,19 @@ dev.off()
 
 # The module kegg functional profiles have already been provided to you
 
-### Import Module KEGG KO compositions
-
-# Import FuncID to functional information
-func_id_to_func_to_net_mod = 
-  read.table(file="RAS_F4_GENES_CLUSTID_to_FUNCID_to_FUNC_to_MOD.txt",
-             sep="\t", header=T, check.names=F)
-
-# Import table containing kegg composition information
-net_mod_kegg_comp=read.csv(
-  file = "RAS_F4_NET_MOD_kegg_functional_composition.txt",
+### Import table containing kegg composition information
+kegg_db=read.csv(
+  file = "KEGG_database_complete.txt",
   sep="\t",check.names=F, header=T)
+
+### Add kegg metabolism information to module functions
+net_mod_func_kegg_comp = 
+    gene_to_func_to_tax %>%
+    mutate(FUNC = gsub("ko:","",FUNC)) %>%
+    left_join(kegg_db, by=c("FUNC" = "KEGG_ko")) %>%
+    left_join(net_mod_components_mod, by=c("funcID" = "nodeId")) %>%
+    select(-Gene,-funcID,-Gene_clustID,-GTDB_taxonomy,-type) %>%
+    unique()
 
 ### To gain an overview on differences in metabolic features between modules,
 ### we will focus on energy metabolisms as well as a selection of those with high
@@ -711,21 +964,21 @@ net_mod_kegg_comp=read.csv(
 
 # Create table with list of kEGG pathways in Energy metabolism
 kegg_energy_metabolism_names = 
-  net_mod_kegg_comp %>%
+  net_mod_func_kegg_comp %>%
   filter(., grepl("Energy metabolism",KEGG_pathway_map)) %>%
-  filter(., !grepl("Oxidative",KEGG_module) & 
-           !grepl("antenna",KEGG_module) & 
-           !grepl("in photosynth",KEGG_module)) %>%
+  filter(., !grepl("Oxidative",KEGG_module),
+             !grepl("antenna",KEGG_module)) %>%
   select(KEGG_module) %>%
   unique()
 
 # Now sum up the number of Functions attributed to all other KEGG pathways and identify those
 # with the highest variance between modules. Then print list of those and combine
 # with the list of energy metabolism pathways
-kegg_mods_high_var = 
-  net_mod_kegg_comp %>%
+kegg_mods_high_var = net_mod_func_kegg_comp %>%
   filter(., !grepl("Energy metabolism",KEGG_pathway_map)) %>%
   filter(., !grepl("Glycolysis",KEGG_module)) %>%
+  select(Module,funcID,KEGG_category,KEGG_pathway_map,KEGG_module) %>%
+  unique() %>%
   select(Module,KEGG_module) %>%
   table() %>%
   as.data.frame() %>%
@@ -737,24 +990,24 @@ kegg_mods_high_var =
   select(KEGG_module,range) %>%
   unique() %>%
   arrange(desc(range)) %>%
-  slice_head(n=9) %>%
+  slice_head(n=10) %>%
   as.data.frame() %>%
   select(KEGG_module) %>%
   unique()
 
 # Combine the two lists of metabolisms of interest
-kegg_modules_of_interest = rbind(kegg_mods_high_var,kegg_energy_mods)
+kegg_modules_of_interest = rbind(kegg_mods_high_var,kegg_energy_metabolism_names)
 
 # Determine the number of functions in each metabolism
 kegg_modules_of_interest_counts = 
-  net_mod_kegg_comp %>%
-  select(Module,KEGG_module) %>%
+  net_mod_func_kegg_comp %>%
+  select(Module,funcID,KEGG_category,KEGG_pathway_map,KEGG_module) %>%
+  unique() %>%
+  select(Module,KEGG_module)
   table() %>%
   as.data.frame() %>%
   filter(KEGG_module %in% kegg_modules_of_interest$KEGG_module) %>%
   mutate(KEGG_module = factor(KEGG_module, levels=unique(kegg_modules_of_interest$KEGG_module)))
-
-###
 
 ### Carbohydrate-active enzyme (CAZymes) composition
 
@@ -763,7 +1016,7 @@ kegg_modules_of_interest_counts =
 
 # Filter out CAZyme annotations from the functional profile
 net_mod_cazymes = 
-  func_id_to_func_to_net_mod %>%
+  net_mod_to_gene_to_func_to_tax %>%
   filter(., grepl("^GH",FUNC) |
            grepl("^PL",FUNC) |
            grepl("^CE",FUNC) |
@@ -775,7 +1028,8 @@ net_mod_cazymes =
            !grepl("_",FUNC) & 
            !grepl("DUF",FUNC) & 
            !grepl("PSD",FUNC)) %>%
-  unique()
+  unique() %>%
+  select(-Gene_clustID,-GTDB_taxonomy,-Gene,-type,-Domain_tiara)
 
 # Determine total count of CAZyme genes in each module and then combine this
 # with the counts of the selected KEGG metabolisms
@@ -805,86 +1059,167 @@ net_mod_kegg_top_metab_modules_plot =
         axis.title.x = element_blank(),
         axis.text.y = element_text(size = 13),
         axis.title.y = element_text(size = 14))
-net_mod_kegg_top_metab_modules_plot
 
 # Export plot
-pdf(file = paste0(output_figures,"/FRAM_RAS_F4_MOD_KEGG_top_metab_modules_barchart.pdf"),
+pdf(file = paste0(output_figures,"FRAM_RAS_F4_NET_mod_KEGG_top_metab_modules_barchart.pdf"),
     height = 10, width = 14)
 net_mod_kegg_top_metab_modules_plot
 dev.off()
 
+################
+
+### Figure 6 and Supplementary Figure 4 - transcription of module functions across Arctic Ocean
 
 ################
 
-### Figure 6 - correlations between module prokaryotic ASVs and microeukaryotic ASVs
 
-###############
+###
 
-library(circlize)
+### Import data
 
-### import tables
+# Import metatranscriptomic abundances from Tara Oceans Arctic dataset
+gene_clust_tara_abund=read.csv(
+  file="FRAM_RAS_F4_GENE_CLUST_arctic_tara_abund.txt",
+  sep="\t",check.names=F, header=T)
 
-mic_asv_to_euk_asv_cor = read.table(file = "RAS_F4_MIC_and_EUK_ASV_correlations.txt",
-           sep="\t", header=T, check.names=F) 
+# Import TaraOcean metadata
+tara_meta=read.csv(
+  file="Tara_oceans_sampling_metadata_all.txt",
+  sep="\t",check.names=F, header=T)
 
-mic_asv_taxa = read.table(file = "RAS_F4_MIC_ASV_taxa.txt",
-                                    sep="\t", header=T, check.names=F)
+###
 
-euk_asv_taxa = read.table(file = "RAS_F4_EUK_ASV_taxa.txt",
-                          sep="\t", header=T, check.names=F)
+### Reformat and subset data
 
-net_mod_to_asv=read.table(
-  file="RAS_F4_NET_MOD_assignments.txt", sep="\t",
-  check.names=F, header=T) %>%
-  filter(., grepl("prok_",nodeId)) %>%
-  select(nodeId,Module)
+tara_meta_subset =
+    tara_meta %>%
+    mutate(Month = case_when(
+        grepl("-05-",`Event_Date/Time_End`) ~ "May",
+        grepl("-06-",`Event_Date/Time_End`) ~ "Jun",
+        grepl("-07-",`Event_Date/Time_End`) ~ "Jul",
+        grepl("-08-",`Event_Date/Time_End`) ~ "Aug",
+        grepl("-09-",`Event_Date/Time_End`) ~ "Sep",
+        grepl("-10-",`Event_Date/Time_End`) ~ "Oct",
+    )) %>%
+    filter(., grepl("0.22-3",Sample_name)) %>%
+    select(Sample_name,Sample_station,Depth_layer,Latitude_Start,Longitude_Start,Month)
 
-net_mod_mic_asv_to_euk_corr = 
-  mic_asv_to_euk_asv_cor %>%
-  left_join(net_mod_to_asv, by=c("From" = "nodeId")) %>%
-  filter(., Module != "NA") %>%
-  filter(., Adjusted_p_value < 0.05) %>%
-  left_join(euk_asv_taxa, by=c("To" = "ASV_name")) %>%
-  filter(., Pearson_R > 0.7) %>%
-  arrange(Module,Phylum,Class,Family)
+###
 
-from = paste(net_mod_mic_asv_to_euk_corr[[5]])
-to = paste(net_mod_mic_asv_to_euk_corr[[8]])
-mat = matrix(0, nrow = length(unique(from)), ncol = length(unique(to)))
-rownames(mat) = unique(from)
-colnames(mat) = unique(to)
-for(i in seq_along(from)) mat[from[i], to[i]] = 1
+### Calculate mean depth of transcription at module level
 
-# set cluster colours for plots
-module_colours = c("M1" = "#008066",
-                   "M2" = "#55DDFF",
-                   "M3" = "#FFB300",
-                   "M4" = "#F55BF5",
-                   "M5" = "#490092",
-                   "M6" = "#920000")
+gene_clust_module_tara_abund_mean_wide = gene_clust_tara_abund %>%
+    filter(., TAD80 > 0) %>%
+    left_join(net_mod_to_gene_to_func_to_tax, by=c("geneID" = "Gene_clustID")) %>%
+    aggregate(TAD80~funcID+Tara_sample+Module, data=., FUN=sum) %>%
+    aggregate(TAD80~Tara_sample+Module, data=., FUN=mean) %>%
+    left_join(tara_meta_subset, by=c("Tara_sample" = "Sample_name")) %>%
+    reshape2::dcast(Depth_layer+Tara_sample+Latitude_Start+Longitude_Start+Month+Sample_station~Module, value.var="TAD80") %>%
+    filter(., !grepl("ZZZ",Tara_sample)) %>%
+    filter(., !grepl("IZZ",Tara_sample))
 
-genus_cols_tmp = as.data.frame(colnames(mat)) %>%
-  mutate(col = "grey")
-genus_cols <- genus_cols_tmp$col
-names(genus_cols) <- genus_cols_tmp$`colnames(mat)`
+###
 
-chord_cols_all <- c(module_colours,genus_cols)
+### Assess transcription of module functions across Arctic
 
-circos.clear()
-circos.par(start.degree = 0)
-pdf(file=paste0(output_figures,"/FRAM_RAS_F4_NET_MOD_bac_ASVs_euk_corr_chord_diagram.pdf"),
-    height = 12, width = 12)
-chordDiagram(mat, order = union(rownames(mat), colnames(mat)), 
-             big.gap = 25, directional = TRUE, grid.col=chord_cols_all,
-             annotationTrack = "grid",
-             preAllocateTracks = list(track.height = 0.4))
+# Reformat coordinates of sample
+coords_utm = gene_clust_module_tara_abund_mean_wide %>% 
+  sf::st_as_sf( coords = c("Longitude_Start", "Latitude_Start") ) %>%
+  sf::st_set_crs( 4326 ) %>%  
+  sf::st_transform( 3995 ) %>%  
+  sf::st_coordinates() %>%
+  as.data.frame()
 
-circos.track(track.index = 1, panel.fun = function(x, y) {
-  circos.text(CELL_META$xcenter, CELL_META$ylim[1], CELL_META$sector.index, 
-              facing = "clockwise", niceFacing = TRUE, adj = c(0, 0.5))
-}, bg.border = NA) # here set bg.border to NA is important
+# Subset data to only include surface water samples for visualising on map
+gene_clust_module_tara_abund_mean_wide_srf_utm = cbind(gene_clust_module_tara_abund_mean_wide,coords_utm) %>%
+    filter(., Depth_layer == "SRF")
 
+# use rnaturalearth package to get coastline data in the sf format
+world_sf <- ne_countries(scale = "medium", returnclass = "sf")
+map_crs <- st_crs(3995) # WGS 84 / Arctic Polar Stereographic
+
+# Visualise mean module transcript depth on map
+mod_func_transc_arctic_map = ggplot() + geom_sf(data = world_sf %>% st_transform(map_crs)) +
+  coord_sf(datum = map_crs,  
+           ylim = c(-3e6,3e6),  
+           xlim = c(-3e6,3e6)) + 
+  geom_scatterpie(data = gene_clust_module_tara_abund_mean_wide_srf_utm, aes(x = X, y = Y, group = Tara_sample), cols = c("M1","M2","M3","M4","M5"),
+  pie_scale = 3) + 
+  scale_fill_manual(values=module_colours) + 
+  theme_bw()
+
+# Visualise mean module transcript depth across surface, DCM and mesopelagic layers in a barplot
+mod_func_transc_arctic_barplot = gene_clust_module_tara_abund_mean_wide %>%
+    select(-Latitude_Start,-Longitude_Start) %>%
+    reshape2::melt(., id.vars=c("Tara_sample","Month","Depth_layer","Sample_station"), variable.name = "Module", value.name = "TAD80") %>%
+    aggregate(TAD80~Tara_sample+Module+Month+Depth_layer+Sample_station, data=., FUN=mean) %>%
+    mutate(Depth_layer = factor(Depth_layer, levels=c("SRF","DCM","MES"))) %>%
+    #mutate(Month = factor(Month, levels=c("May","Jun","Jul","Aug","Sep","Oct"))) %>%
+    ggplot(., aes(x = Sample_station, y = TAD80)) +  
+    geom_bar(aes(fill = Module), stat = "identity", position = "stack") + 
+    facet_grid(Depth_layer~., scales="free_y") + 
+    labs(y = "Truncated average depth of transcripts") +
+    scale_fill_manual(values = module_colours) + 
+    theme_bw() + 
+    theme(axis.text.x = element_text(size = 12, angle=45, hjust=1),
+        axis.title.x = element_blank(),
+        axis.text.y = element_text(size = 11),
+        axis.title.y = element_text(size = 12),
+        strip.background.y = element_rect(fill = "white", colour = "black"),
+        strip.text.y = element_text(size = 12))
+
+# Export figures
+pdf(file=paste0(output_figures,"FRAM_RAS_F4_NET_mod_FUNC_transcript_tara_map.pdf"), height=10, width=12)
+mod_func_transc_arctic_map
 dev.off()
+pdf(file=paste0(output_figures,"FRAM_RAS_F4_NET_mod_FUNC_transcript_tara_barplot.pdf"), height=8, width=10)
+mod_func_transc_arctic_barplot
+dev.off()
+
+###
+
+### Assess mean transcript depth of module functions within energy metabolism pathways
+
+
+# Create long-format table of combined transcript depth at functional cluster level
+gene_clust_tara_abund_long = gene_clust_tara_abund %>%
+    filter(., TAD80 > 0) %>%
+    left_join(net_mod_to_gene_to_func_to_tax, by=c("geneID" = "Gene_clustID")) %>%
+    aggregate(TAD80~funcID+FUNC+Tara_sample+Module, data=., FUN=sum) %>%
+    left_join(tara_meta_subset, by=c("Tara_sample" = "Sample_name")) %>%
+    select(funcID,FUNC,Tara_sample,Module,Depth_layer,TAD80)
+
+# Combine functional transcript depth information with KEGG energy metabolism pathways and calculate mean transcript depth per pathway
+gene_clust_tara_abund_module_top_metab = gene_clust_tara_abund_long %>%
+    filter(., grepl("ko:",FUNC)) %>%
+    mutate(FUNC= gsub("ko:","",FUNC)) %>%
+    left_join(kegg_db, by=c("FUNC" = "KEGG_ko")) %>%
+    aggregate(TAD80~KEGG_module+KEGG_pathway_map+Module+Depth_layer, data=., FUN=mean)
+
+# Visualise mean module transcript of energy metabolism pathways across depth layers
+gene_clust_tara_abund_module_top_metab_barplot = gene_clust_tara_abund_module_top_metab %>%
+    filter(., KEGG_pathway_map == "Energy metabolism") %>%
+    filter(., Module == "M3" | Module == "M5") %>%
+    mutate(Depth_layer = factor(Depth_layer, levels=c("SRF","DCM","MES"))) %>%
+    #mutate(Month = factor(Month, levels=c("May","Jun","Jul","Aug","Sep","Oct"))) %>%
+    ggplot(., aes(x = KEGG_module, y = TAD80)) +  
+    geom_bar(aes(fill = Module), stat = "identity", position = "stack") + 
+    facet_grid(Depth_layer~., scales="free_y") + 
+    labs(y = "Truncated average depth of transcripts") +
+    scale_fill_manual(values = module_colours) + 
+    theme_bw() + 
+    theme(axis.text.x = element_text(size = 12, angle=45, hjust=1),
+        axis.title.x = element_blank(),
+        axis.text.y = element_text(size = 11),
+        axis.title.y = element_text(size = 12),
+        strip.background.y = element_rect(fill = "white", colour = "black"),
+        strip.text.y = element_text(size = 12))
+
+# Export figure
+pdf(file=paste0(output_figures,"FRAM_RAS_F4_NET_mod_FUNC_transcript_tara_energy_metab_barplot.pdf"), height=8, width=10)
+gene_clust_tara_abund_module_top_metab_barplot
+dev.off()
+
 
 ################
 
@@ -902,28 +1237,10 @@ library(broom)
 library(furrr)
 library(vegan)
 
-# Import gene clust ID to FUNC ID to FUNCTION info
-clustID_to_funcID_to_FUNC_to_NetMod = 
-  read.table(file="RAS_F4_GENES_CLUSTID_to_FUNCID_to_FUNC_to_MOD.txt",
-             sep="\t", header=T, check.names=F)
-
-# Import gene cluster raw count data
-ras_mg_geneclust_raw_abund=read.table(
-  file="RAS_F4_GENE_CLUSTID_filt_raw_wide.txt",
-  sep="\t",check.names=F, header=T)
-
-# Import sample name to RAS_id mapping file
-RAS_id_to_date = read.table(file="RAS_F4_META.txt", sep="\t",
-                                    check.names=F, header=T) %>%
+### Set up tables
+RAS_id_to_date = sample_meta %>%
   select(RAS_id,date) %>%
   mutate(date = format(as.Date(date, format="%d.%m.%Y")))
-
-# Import function relative abundance table
-mic_clust_func_rel_abund_long = read.table(
-  file="RAS_F4_MIC_OSC4_FUNC_CLUST_rel_abund_wide.txt",
-  check.names=F, sep="\t") %>%
-  tibble::rownames_to_column(., var="nodeId") %>%
-  reshape2::melt(id.vars="nodeId", variable.name="RAS_id", value.name="Rel_abund")
 
 ### AIM: compare the diversity of genetic variants within functions over time
 ### This can provide insights into whether at times of functional gene peaks, there is
@@ -931,25 +1248,25 @@ mic_clust_func_rel_abund_long = read.table(
 
 ### Firstly, let's assess the number of functions comprised of single and multiple
 ### gene clusters
-clustID_to_funcID_to_FUNC_to_NetMod %>%
+net_mod_to_gene_to_func_to_tax %>%
   select(funcID) %>%
   table() %>%
   as.data.frame() %>%
   filter(Freq > 1) %>%
   dim()
 
-clustID_to_funcID_to_FUNC_to_NetMod %>%
+net_mod_to_gene_to_func_to_tax %>%
   select(funcID) %>%
   table() %>%
   as.data.frame() %>%
   filter(Freq == 1) %>%
   dim()
 
-(2478/(2478+8842))*100
+(5554/(5554+2075))*100
 
 ### Calculate per module proportions of singleton and multiple gene-cluster functions
 mod_func_prop_singleton_and_multiple = 
-  clustID_to_funcID_to_FUNC_to_NetMod %>%
+  net_mod_to_gene_to_func_to_tax %>%
   select(Module,funcID) %>%
   table() %>%
   as.data.frame() %>%
@@ -967,7 +1284,6 @@ mod_func_prop_singleton_and_multiple =
   tibble::rownames_to_column (., var="Module") %>%
   reshape2::melt(., variable.name = "Category", value.name = "Proportion")
 
-
 ### Visualise proportions in pie charts
 mod_func_prop_singleton_and_multiple_piecharts = 
   ggplot(mod_func_prop_singleton_and_multiple, aes(x="", y=Proportion, fill=Category)) +
@@ -980,21 +1296,19 @@ mod_func_prop_singleton_and_multiple_piecharts =
   theme(legend.title = element_blank(),
         legend.text = element_text(size = 11),
         strip.text.x = element_text(size = 11))
-
 ### export figure
-pdf(file=paste0(output_figures,"/FRAM_RAS_F4_NET_MOD_func_singleton_vs_multi_piecharts.pdf"), height=4, width=8)
+pdf(file=paste0(output_figures,"FRAM_RAS_F4_NET_MOD_func_singleton_vs_multi_piecharts.pdf"), height=4, width=8)
 mod_func_prop_singleton_and_multiple_piecharts
 dev.off()
 
-# Create dataframes containing with singleton gene cluster functions
-single_cluster_funcs = clustID_to_funcID_to_FUNC_to_NetMod %>%
+### Create dataframes containing single gene-cluster and multi gene-cluster functions
+single_cluster_funcs = net_mod_to_gene_to_func_to_tax %>%
   select(Module,funcID,FUNC) %>%
   table() %>%
   as.data.frame() %>%
   filter(Freq == 1)
 
-# Create dataframe with multi gene cluster functions
-multi_cluster_funcs = clustID_to_funcID_to_FUNC_to_NetMod %>%
+multi_cluster_funcs = net_mod_to_gene_to_func_to_tax %>%
   select(Module,funcID,FUNC) %>%
   table() %>%
   as.data.frame() %>%
@@ -1005,7 +1319,7 @@ multi_cluster_funcs = clustID_to_funcID_to_FUNC_to_NetMod %>%
 
 # Filter dataframes to contain only information for functions with multiple gene clusters
 clustid_to_funcid_to_net_mod_multi = 
-  clustID_to_funcID_to_FUNC_to_NetMod %>%
+  net_mod_to_gene_to_func_to_tax %>%
   filter(., funcID %in% multi_cluster_funcs$funcID)
 
 func_multi_to_mod = 
@@ -1014,31 +1328,9 @@ func_multi_to_mod =
   unique()
 
 mic_func_rel_multi = 
-  mic_func_rel %>%
+  func_osc4_rel_wide %>%
   filter(., funcID %in% multi_cluster_funcs$funcID)
 
-# Subset gene cluster raw count table to those within multiple-gene cluster functions
-net_mod_func_multi_gene_cluster_raw_abund = 
-  ras_mg_geneclust_raw_abund %>%
-  filter(., clustID %in% clustid_to_funcid_to_net_mod_multi$clustID) %>%
-  tibble::column_to_rownames(., var="clustID") %>%
-  mutate_all(., ~replace_na(.,0))
-
-# Identify lowest count across samples
-net_mod_func_multi_gene_cluster_raw_abund %>%
-  colSums() %>%
-  sort() %>%
-  head(n=2)
-
-# clearly one sample significantly lower than others, will remove this one sample
-# and rarefy to the next samllest
-net_mod_func_multi_gene_cluster_raw_abund_rarefied = 
-  net_mod_func_multi_gene_cluster_raw_abund %>%
-  select(-"03_2019_F4_1") %>%
-  t() %>%
-  rrarefy(., 23000) %>%
-  t() %>%
-  as.data.frame()
 
 # FUNCTION: filter rarefied gene cluster count matrix for specific function,
 # then calculate shannon diversity of gene clusters within that function across
@@ -1063,16 +1355,26 @@ clusterEvalQ(cl, {
 
 # Use foreach to loop through all functions
 result_df <- foreach (genefunction = funcID_list, .combine = 'rbind') %dopar% {
-  clusters_of_interest <- clustid_to_funcid_to_net_mod_multi[clustid_to_funcid_to_net_mod_multi$funcID == genefunction, ] %>%
-    select(funcID,clustID)
-  temp <- net_mod_func_multi_gene_cluster_raw_abund_rarefied[rownames(net_mod_func_multi_gene_cluster_raw_abund_rarefied) %in% 
-                                                               clustid_to_funcid_to_net_mod_multi$clustID, , drop = FALSE] %>%
-    vegan::diversity(., index="shannon", MARGIN=2) %>%
-    as.data.frame(., nm="Diversity") %>%
-    tibble::rownames_to_column(., var="RAS_id") %>%
-    mutate(nodeId = genefunction)
-  print(paste(genefunction, "finished"))
-  return(temp)
+    clusters_of_interest <- clustid_to_funcid_to_net_mod_multi[clustid_to_funcid_to_net_mod_multi$funcID == genefunction, ] %>%
+        select(funcID,Gene_clustID)
+    
+    temp <- gene_osc4_rare_rel[rownames(gene_osc4_rare_rel) %in% clusters_of_interest$Gene_clustID, ]
+    
+    # Check if temp has any rows
+    if (nrow(temp) > 0) {
+        temp <- temp %>%
+            vegan::diversity(index = "shannon", MARGIN = 2) %>%  # Shannon diversity
+            as.data.frame(nm = "Diversity") %>%  # Convert to dataframe
+            tibble::rownames_to_column(var = "RAS_id") %>%  # Add rownames as a column
+            mutate(funcID = genefunction)  # Add the genefunction (funcID)
+        
+        print(paste(genefunction, "finished"))
+        
+        return(temp)  # Return the result
+    } else {
+        # If empty, return NULL or an empty dataframe
+        return(NULL)
+    }
 }
 
 # end parallelization
@@ -1081,30 +1383,30 @@ stopCluster(cl)
 # Filter for those with Diversity values (after rarefaction, some functions
 # won't have abundance information and thus no diversity)
 func_with_div_values = result_df %>%
-  aggregate(Diversity~nodeId, FUN=sum, data=.) %>%
+  aggregate(Diversity~funcID, FUN=sum, data=.) %>%
   filter(., Diversity > 0) %>%
-  select(nodeId)
+  select(funcID)
 
-result_df_filt = result_df[result_df$nodeId %in% func_with_div_values$nodeId, ]
+result_df_filt = result_df[result_df$funcID %in% func_with_div_values$funcID, ]
 
-### Export this dataframe
 write.table(result_df_filt,
-            file=paste0(output_tables,"/FRAM_RAS_F4_FUNC_shannon_diversity_per_func.txt"),
-            sep="\t")
+            file=paste0(output_figures,"FRAM_RAS_F4_FUNC_shannon_diversity_per_func.txt"),
+            sep="\t", quote=F, row.names=F)
 
 ### Now investigate linear relationship between shannon diversity and module functions
-mic_func_div_and_abund_long = mic_clust_func_rel_abund_long %>%
-  filter(., nodeId %in% clustid_to_funcid_to_net_mod_multi$funcID) %>%
-  left_join(result_df_filt, by=c("nodeId","RAS_id")) %>%
+mic_func_div_and_abund_long = func_osc4_rel_wide %>%
+  reshape2::melt(id.vars=c("funcID"), variable.name="RAS_id", value.name="Rel_abund") %>%
+  filter(., funcID %in% clustid_to_funcid_to_net_mod_multi$funcID) %>%
+  left_join(result_df_filt, by=c("funcID","RAS_id")) %>%
   filter(., Diversity != "NA")
 
 # Create list of funcID's to loop over
-cl <- makeCluster(4)
+cl <- makeCluster(6)
 registerDoParallel(cl)
 
 # Function to perform linear regression for each unique nodeId
-perform_regression <- function(nodeId, data) {
-  test <- data[data$nodeId == nodeId, ]
+perform_regression <- function(funcID, data) {
+  test <- data[data$funcID == funcID, ]
   
   result <- tryCatch({
     lm_result <- lm(Rel_abund ~ Diversity, data = test)
@@ -1113,36 +1415,40 @@ perform_regression <- function(nodeId, data) {
       p_value <- round(summary(lm_result)$coefficients[2, 4], 5)
       adj_rsquared <- round(summary(lm_result)$adj.r.squared, 3)
       
-      return(data.frame(nodeId = nodeId, p_value = p_value, adj_rsquared = adj_rsquared))
+      return(data.frame(funcID = funcID, p_value = p_value, adj_rsquared = adj_rsquared))
     } else {
-      cat("Skipping regression for nodeId:", nodeId, "due to an error in linear regression\n")
+      cat("Skipping regression for funcId:", funcID, "due to an error in linear regression\n")
       return(NULL)
     }
   }, error = function(e) {
-    cat("Skipping regression for nodeId:", nodeId, "due to an error in linear regression\n")
+    cat("Skipping regression for funcId:", funcID, "due to an error in linear regression\n")
     return(NULL)
   })
   
   return(result)
 }# Get unique nodeIds
-unique_nodeIds <- unique(mic_func_div_and_abund_long$nodeId)
+unique_funcIDs <- unique(mic_func_div_and_abund_long$funcID)
 
 # Use foreach to apply the function in parallel
-results_df <- future_map_dfr(unique_nodeIds, ~perform_regression(.x, mic_func_div_and_abund_long))
-results_df
+lm_results_df <- future_map_dfr(unique_funcIDs, ~perform_regression(.x, mic_func_div_and_abund_long))
 
 # Stop parallel processing
 stopCluster(cl)
 
 # Perform multiple testing correction with the Benjamini-Hochberg procedure
-results_df$p_adjusted <- p.adjust(results_df$p_value, method = "BH")
+lm_results_df$p_adjusted <- p.adjust(lm_results_df$p_value, method = "BH")
 
 # Filter to retain only significant hits and add in module information
 net_mod_func_signif_lm_df = 
-  results_df %>%
+  lm_results_df %>%
   filter(., p_adjusted < 0.05) %>%
-  left_join(func_multi_to_mod, by=c("nodeId" = "funcID")) %>%
+  left_join(func_multi_to_mod, by=c("funcID")) %>%
   unique()
+
+
+write.table(net_mod_func_signif_lm_df,
+            file=paste0(output_tables,"FRAM_RAS_F4_FUNC_diversity_vs_abund_lm_signif.txt"),
+            sep="\t", quote=F, row.names=F)
 
 # Create a dataframe that indicates the total number of multi-gene cluster functions
 # per module 
@@ -1178,30 +1484,21 @@ net_mod_func_signif_lm_summary_prop =
 # along with an identifier (will be used for colouring in figure)
 signif_func_with_label = 
   net_mod_func_signif_lm_df %>%
-  select(nodeId) %>%
+  select(funcID) %>%
   mutate(type = "Significant")
 
 # Create dataframe with diveristy and relative abundance info for functions
 # that showed significant linear relationship
 mic_func_div_and_abund_with_labels = 
   mic_func_div_and_abund_long %>%
-  left_join(func_multi_to_mod, by=c("nodeId" = "funcID")) %>%
-  left_join(signif_func_with_label, by="nodeId") %>%
+  left_join(func_multi_to_mod, by=c("funcID")) %>%
+  left_join(signif_func_with_label, by="funcID") %>%
     mutate(type = case_when(
       type == "Significant" ~ "Significant",
       TRUE ~ "Not_significant"
     )) %>%
   arrange(type) %>%
   mutate(type = factor(type, levels=unique(type)))
-
-### Create figure
-module_colours = c("M1" = "#008066",
-                   "M2" = "#55DDFF",
-                   "M3" = "#FFB300",
-                   "M4" = "#F55BF5",
-                   "M5" = "#490092",
-                   "M6" = "#920000")
-
 
 library(patchwork)
 
@@ -1254,25 +1551,20 @@ for (modulename in c("M1","M2","M3","M4","M5")){
                                                  modulename))
 }
 
+
 ## Export plots (will export separately and join into figure later as the plots are 
 ## large and their composite nature renders combining them challenging)
-pdf(file = paste0(output_figures,"/FRAM_RAS_F4_NET_MOD_ALL_func_abund_vs_diversity_scatter.pdf"),
+pdf(file = paste0(output_figures,"FRAM_RAS_F4_NET_mod_ALL_func_abund_vs_diversity_scatter.pdf"),
     height = 8, width = 10)
 M1_functions_rel_abund_and_diversity_scatter+M2_functions_rel_abund_and_diversity_scatter+M3_functions_rel_abund_and_diversity_scatter+
   M4_functions_rel_abund_and_diversity_scatter+M5_functions_rel_abund_and_diversity_scatter+plot_spacer()+plot_layout(ncol=3,nrow=2)
 dev.off()
 
-pdf(file = paste0(output_figures,"/FRAM_RAS_F4_NET_MOD_ALL_func_abund_vs_diversity_sig_bars.pdf"),
+pdf(file = paste0(output_figures,"FRAM_RAS_F4_NET_mod_ALL_func_abund_vs_diversity_sig_bars.pdf"),
     height = 8, width = 9)
 M1_functions_rel_abund_and_diversity_signif_bar+M2_functions_rel_abund_and_diversity_signif_bar+M3_functions_rel_abund_and_diversity_signif_bar+
   M4_functions_rel_abund_and_diversity_signif_bar+M5_functions_rel_abund_and_diversity_signif_bar+plot_spacer()+plot_layout(ncol=3,nrow=2)
 dev.off()
-
-## Export table with significant lm results after correction to prevent 
-## recalculation later 
-write.table(net_mod_func_signif_lm_df,
-            file=paste0(output_tables,"/FRAM_RAS_F4_NET_MOD_FUNC_shannon_div_vs_abund_lm_sig_results.txt"),
-            sep="\t")
 
 ### Beyond exploring whether the diversity shifts over time, we are also interested
 ### to find out whether the same gene variants dominate the abundance of each 
@@ -1284,30 +1576,15 @@ write.table(net_mod_func_signif_lm_df,
 ### the top 3 samples for each module for each year. These are the samples in which
 ### the functional genes of the module reach highest abundances during the year 
 
-# Import the combined functional gene abundance information for modules
-net_mod_func_rel_abund = 
-  read.table(file="RAS_F4_NET_MOD_FUNC_relative_abundance.txt", 
-             sep="\t", header=T)
-
-# Import the functional cluster abundance information for modules
-mic_func_rel = 
-  read.table(file="RAS_F4_MIC_OSC4_FUNC_CLUST_rel_abund_wide.txt", 
-             sep="\t", header=T, check.names = F)
-
-# Import network module assignments
-net_mod_components = 
-  read.table(file="RAS_F4_NET_MOD_assignments.txt", 
-             sep="\t", header=T)
-
 # Create funcID to FUNC mapping
 funcID_to_func_mapping =
-  clustID_to_funcID_to_FUNC_to_NetMod %>%
+  net_mod_to_gene_to_func_to_tax %>%
   select(funcID,FUNC)
 
 # identify top three samples per year based on abundance - here we only focus
 # on the complete julian years (2017,2018,2019) to ensure the peak each year is
 # covered
-mod_sample_peaks = net_mod_func_rel_abund %>%
+mod_sample_peaks = mic_func_module_rel_abund_long %>%
   mutate(year = case_when(
     RAS_id = grepl("2016",RAS_id) ~ "2016",
     RAS_id = grepl("2017",RAS_id) ~ "2017",
@@ -1323,18 +1600,6 @@ mod_sample_peaks = net_mod_func_rel_abund %>%
   select(Module,RAS_id,year) %>%
   mutate(mod_and_peak = paste(Module,"-",RAS_id,sep=""))
 
-# Import gene cluster abundance table
-mic_gene_clust_rel = read.table(file="RAS_F4_MIC_GENE_CLUST_OSC4_rel_abund_wide.txt",
-           sep="\t", check.names=F, header=T) %>%
-  tibble::rownames_to_column(., var="clustID") %>%
-  melt(., variable.name="RAS_id", value.name="gene_rel_abund")
-
-# Import module KEGG annotation information
-net_mod_kegg_composition_single_hits_with_annotations = 
-  read.table(file = "Network_analysis/FRAM_RAS_F4_MOD_kegg_singlehit_composition.txt",sep="\t", check.names=F, header=T) 
-net_mod_kegg_composition_all_hits_with_annotations = 
-  read.table(file = "Network_analysis/FRAM_RAS_F4_MOD_kegg_allhits_composition.txt",
-             sep="\t",check.names=F, header=T)
 
 # FUNCTION: The function will combine the information from the functional cluster
 # and gene cluster abundances, then filter for the three samples per year identified 
@@ -1343,7 +1608,7 @@ net_mod_kegg_composition_all_hits_with_annotations =
 # The result is a single gene cluster for each function on each peak sample date in each
 # annual cycle
 identify_top_gene_clust_for_func_in_peak_samples <- 
-  function(gene_to_func,mod_components,func_rel,gene_rel,mod_peaks,module_name) {
+  function(gene_to_func,func_rel,gene_rel,mod_peaks,module_name) {
     func_names = gene_to_func %>%
       filter(., Module == module_name) %>%
       select(funcID) %>%
@@ -1354,17 +1619,19 @@ identify_top_gene_clust_for_func_in_peak_samples <-
     
     temp1 = gene_to_func %>%
       filter(., funcID %in% func_names$funcID) %>%
-      select(funcID,clustID)
+      select(funcID,Gene_clustID,Module)
     
     temp2 = func_rel %>%
+      reshape2::melt(., id.vars=c("funcID"), variable.name="RAS_id", value.name="func_rel_abund") %>%
       filter(., funcID %in% func_names$funcID)
     
     top_gene_clust_hits = gene_rel %>%
-      filter(., clustID %in% temp1$clustID) %>%
-      left_join(temp1, by="clustID") %>%
+      tibble::rownames_to_column(., var="Gene_clustID") %>%
+      filter(., Gene_clustID %in% temp1$Gene_clustID) %>%
+      reshape2::melt(., id.vars=c("Gene_clustID"), variable.name="RAS_id", value.name="gene_rel_abund") %>%
+      left_join(temp1, by="Gene_clustID") %>%
       left_join(temp2, by=c("funcID","RAS_id")) %>%
       mutate(func_proportion = (gene_rel_abund/func_rel_abund)*100) %>%
-      mutate(Module = module_name) %>%
       mutate(mod_and_peak = paste(Module,"-",RAS_id,sep="")) %>%
       filter(., mod_and_peak %in% mod_peaks$mod_and_peak) %>%
       left_join(mod_peaks, by=c("mod_and_peak","Module","RAS_id")) %>%
@@ -1374,7 +1641,7 @@ identify_top_gene_clust_for_func_in_peak_samples <-
       arrange(desc(func_proportion)) %>%
       slice_head(n=1) %>%
       as.data.frame() %>%
-      arrange(funcID,year)
+      arrange(funcID,year) 
     return(top_gene_clust_hits)
   }
 
@@ -1382,9 +1649,9 @@ identify_top_gene_clust_for_func_in_peak_samples <-
 # across peak samples?
 calc_freq_of_top_gene_clust_recurring <- function(mod_peak_gene_clust,funcID_to_func_mapping,module_name){
   mod_peak_gene_clust %>%
-    select(clustID,funcID,Module,year) %>%
+    select(Gene_clustID,funcID,Module,year) %>%
     unique() %>%
-    group_by(clustID,funcID,Module) %>%
+    group_by(Gene_clustID,funcID,Module) %>%
     summarise(count = n()) %>%
     as.data.frame() %>%
     mutate(category = case_when(
@@ -1399,17 +1666,6 @@ calc_freq_of_top_gene_clust_recurring <- function(mod_peak_gene_clust,funcID_to_
     left_join(funcID_to_func_mapping, by="funcID") %>%
     unique()
 }
-
-tmp = clustID_to_funcID_to_FUNC_to_NetMod %>%
-  filter(., Module == "M1") %>%
-  select(funcID) %>%
-  table() %>%
-  as.data.frame() %>%
-  filter(., Freq > 1) %>%
-  select(funcID)
-head(mic_func_rel)
-clustID_to_funcID_to_FUNC_to_NetMod %>%
-  filter(., funcID %in% tmp$funcID)
   
 # Perform a loop to run over the above two functions for each module and produce
 # output tables with information
@@ -1417,10 +1673,9 @@ for (modulename in c("M1","M2","M3","M4","M5")){
   mod_peaks = mod_sample_peaks %>%
     filter(., Module == modulename)
   out1 <- paste(modulename, "_top_gene_clust_per_peak", sep = "")
-  assign(out1, identify_top_gene_clust_for_func_in_peak_samples(clustID_to_funcID_to_FUNC_to_NetMod,
-                                                                net_mod_components,
-                                                                mic_func_rel,
-                                                                mic_gene_clust_rel,
+  assign(out1, identify_top_gene_clust_for_func_in_peak_samples(net_mod_to_gene_to_func_to_tax,
+                                                                func_osc4_rel_wide,
+                                                                gene_osc4_rel_wide,
                                                                 mod_peaks,
                                                                 modulename))
   out2 <- paste(modulename, "_freq_top_gene_clust_recurrence", sep = "")
@@ -1441,34 +1696,15 @@ module_top_gene_cluster_per_function_recurrence =
   unique()
 
 write.table(module_top_gene_clust_per_peak, 
-            file = "Network_analysis/FRAM_RAS_F4_NET_MOD_multi_func_top_gene_clusters_per_peak.txt",
-            sep="\t")
+            file = paste0(output_tables,"FRAM_RAS_F4_NET_mod_multi_func_top_gene_clusters_per_peak.txt"),
+            sep="\t", quote=F, row.names=F)
 
 write.table(module_top_gene_cluster_per_function_recurrence, 
-            file = "Network_analysis/FRAM_RAS_F4_NET_MOD_multi_func_same_or_different_gene_cluster.txt",
-            sep="\t")
+            file = paste0(output_tables,"FRAM_RAS_F4_NET_mod_multi_func_same_or_different_gene_cluster.txt"),
+            sep="\t", quote=F, row.names=F)
 
 ### Combine information on different or same gene cluster with output from
 ### linear regression
-temp = net_mod_func_signif_lm_df %>%
-  select(nodeId,adj_rsquared) %>%
-  left_join(module_top_gene_cluster_per_function_recurrence, by=c("nodeId" = "funcID"))
-View(temp)
-module_top_gene_cluster_per_function_recurrence %>%
-  select(funcID,category)
-module_top_gene_cluster_per_function_recurrence %>%
-  left_join(net_mod_func_signif_lm_df, by=c("Module","funcID" = "nodeId")) %>%
-  filter(., p_value > 0)
-
-net_mod_func_signif_lm_df %>%
-  left_join(module_top_gene_cluster_per_function_recurrence, by=c("Module","nodeId" = "funcID"))
-module_top_gene_cluster_per_function_recurrence
-module_top_gene_cluster_per_function_recurrence %>%
-  select(category) %>%
-  table() %>%
-  as.data.frame()
-1113+1325
-(1113/(1113+1325))*100
 
 # Calculate the relative proportion of multi-gene cluster functions for which
 # a significant positive linear relationship between diversity and abundance was
@@ -1487,12 +1723,6 @@ module_top_gene_cluster_per_function_recurrence_proportion
 
 # Visualise the results about dominant gene cluster recurrence across years
 # set cluster colours for plots
-module_colours = c("M1" = "#008066",
-                   "M2" = "#55DDFF",
-                   "M3" = "#FFB300",
-                   "M4" = "#F55BF5",
-                   "M5" = "#490092",
-                   "M6" = "#920000")
 
 module_top_gene_cluster_freq_per_function_per_year = 
   ggplot(module_top_gene_cluster_per_function_recurrence_proportion,
@@ -1512,55 +1742,7 @@ module_top_gene_cluster_freq_per_function_per_year =
         legend.title = element_blank(),
         legend.text = element_text(size = 12))
 
-### export
-pdf(file=paste0(output_figures,"/FRAM_RAS_F4_MOD_FUNC_gene_variant_recurrence_barplot.pdf"),
+pdf(file=paste0(output_figures,"FRAM_RAS_F4_NET_mod_FUNC_gene_variant_recurrence_barplot.pdf"),
     height = 6, width = 8)
 module_top_gene_cluster_freq_per_function_per_year
 dev.off()
-
-
-
-
-
-
-
-
-
-###
-### Explore the data further with a focus on those functions that do have
-### the same recurrent, dominant gene variant. What are these functions? Do they
-### represent specialised traits?
-
-module_top_gene_cluster_per_function_recurrence = read.table(
-  file = "Network_analysis/FRAM_RAS_F4_NET_MOD_multi_func_same_or_different_gene_cluster.txt",
-  sep="\t", check.names=F, header=T)
-
-# Import module KEGG annotation information
-net_mod_kegg_composition = 
-  read.table(file = "Network_analysis/FRAM_RAS_F4_NET_MOD_kegg_functional_composition.txt",sep="\t", check.names=F, header=T)  %>%
-  select(Module,FUNC,KEGG_category,KEGG_pathway_map,KEGG_module,Gene_description) %>%
-  arrange(Module,KEGG_category,KEGG_pathway_map,KEGG_module,Gene_description)
-
-# Extract functional clusters dominated by same gene cluster each year
-# and that were annotated by KEGG database. Then combine with KEGG metabolic category
-# information
-same_clust_kegg_functions = 
-  module_top_gene_cluster_per_function_recurrence %>%
-  filter(., grepl("Same", category)) %>%
-  mutate(FUNC = gsub("ko:","",FUNC)) %>%
-  separate_rows(., FUNC, sep=",") %>%
-  as.data.frame() %>%
-  left_join(net_mod_kegg_composition, by=c("FUNC","Module")) %>%
-  unique() %>%
-  filter(., KEGG_category != "NA") %>%
-  arrange(Module,KEGG_category,KEGG_pathway_map,KEGG_module,Gene_description,FUNC)
-  
-diff_clust_kegg_functions = 
-  module_top_gene_cluster_per_function_recurrence %>%
-  filter(., grepl("Different", category)) %>%
-  mutate(FUNC = gsub("ko:","",FUNC)) %>%
-  separate_rows(., FUNC, sep=",") %>%
-  as.data.frame() %>%
-  left_join(net_mod_kegg_composition, by=c("FUNC","Module")) %>%
-  unique() %>%
-  arrange(Module,KEGG_category,KEGG_pathway_map,KEGG_module,Gene_description,FUNC)
