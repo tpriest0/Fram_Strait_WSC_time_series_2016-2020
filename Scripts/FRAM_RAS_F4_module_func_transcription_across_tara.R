@@ -1,5 +1,5 @@
 ### Define working directory
-setwd('/nfs/cds-peta/exports/biol_micro_cds_gr_sunagawa/scratch/tpriest/projects/fram_wsc/')
+setwd('XXXXXX')
 
 ### Load libraries
 library(dplyr)
@@ -40,17 +40,19 @@ net_mod_to_gene_to_func_to_tax=read.csv(
 
 # Import metatranscriptomic abundances from Tara Oceans Arctic dataset
 gene_clust_tara_abund=read.csv(
-  file="output_files/TOPC_mapping/FRAM_RAS_F4_proteins_all_clust_rep_filt_TOPC_TAD80.txt",
+  file="data_files/FRAM_RAS_F4_proteins_all_clust_rep_filt_TOPC_TAD80.txt",
   sep="\t",check.names=F, header=T)
 
 # Import TaraOcean metadata
+### NOTE: The below file contains information on Tara Ocean Polar Circle samples. This information can be retrieved from Zenodo.
 tara_meta=read.csv(
   file="data_files/Tara_oceans_sampling_metadata_all.txt",
   sep="\t",check.names=F, header=T)
 
 # Import table containing kegg composition information
+### NOTE: The below file can not be provided as KEGG is a paid database. It is a file that contains information mapping KEGG KO's to metabolisms and pathways
 kegg_db=read.csv(
-  file = "data_files/KEGG_database_complete.txt",
+  file = "XXXXXX.txt",
   sep="\t",check.names=F, header=T)
 
 #####
