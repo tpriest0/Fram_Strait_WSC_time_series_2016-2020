@@ -29,11 +29,11 @@ library(tibble)
 ### Import data
 
 # Import microbial ASV count data
-mic_asv_raw=read.table(file="FRAM_RAS_F4_MIC_ASV_raw_counts.txt", sep="\t",
+mic_asv_raw=read.table(file="FRAM_RAS_F4_PROK_ASV_raw_counts.txt", sep="\t",
                        check.names=F, header=T)
 
 # Import microbial ASV taxa information
-mic_asv_taxa=read.table(file="FRAM_RAS_F4_MIC_ASV_taxa.txt", sep="\t",
+mic_asv_taxa=read.table(file="FRAM_RAS_F4_PROK_ASV_taxa.txt", sep="\t",
                        check.names=F, header=T)
 
 # Import eukaryotic ASV count data
@@ -134,19 +134,19 @@ euk_asv_filt_rel_mod = subset(euk_asv_filt_rel, select=-c(`02_2018_F4_2`))
 ### Export tables
 
 write.table(mic_asv_filt_raw_wide,
-            file=paste0(output_tables,"FRAM_RAS_F4_MIC_ASV_filt_raw.txt"), sep="\t", row.names = F, quote = F)
+            file=paste0(output_tables,"FRAM_RAS_F4_PROK_ASV_filt_raw.txt"), sep="\t", row.names = F, quote = F)
 write.table(mic_asv_filt_rel,
-            file=paste0(output_tables,"FRAM_RAS_F4_MIC_ASV_filt_rel.txt"), sep="\t", row.names = F, quote = F)
+            file=paste0(output_tables,"FRAM_RAS_F4_PROK_ASV_filt_rel.txt"), sep="\t", row.names = F, quote = F)
 write.table(euk_asv_filt_raw_wide,
             file=paste0(output_tables,"FRAM_RAS_F4_EUK_ASV_filt_raw.txt"), sep="\t", row.names = F, quote = F)
 write.table(euk_asv_filt_rel_mod,
             file=paste0(output_tables,"FRAM_RAS_F4_EUK_ASV_filt_rel.txt"), sep="\t", row.names = F, quote = F) 
 write.table(mic_asv_filt_rarefied,
-            file=paste0(output_tables,"FRAM_RAS_F4_MIC_ASV_filt_rare_raw.txt"), sep="\t", row.names = F, quote = F)
+            file=paste0(output_tables,"FRAM_RAS_F4_PROK_ASV_filt_rare_raw.txt"), sep="\t", row.names = F, quote = F)
 write.table(euk_asv_filt_rarefied,
             file=paste0(output_tables,"FRAM_RAS_F4_EUK_ASV_filt_rare_raw.txt"), sep="\t", row.names = F, quote = F)
 write.table(mic_asv_filt_rarefied_rel,
-            file=paste0(output_tables,"FRAM_RAS_F4_MIC_ASV_filt_rare_rel.txt"), sep="\t", row.names = F, quote = F)
+            file=paste0(output_tables,"FRAM_RAS_F4_PROK_ASV_filt_rare_rel.txt"), sep="\t", row.names = F, quote = F)
 write.table(euk_asv_filt_rarefied_rel,
             file=paste0(output_tables,"FRAM_RAS_F4_EUK_ASV_filt_rare_rel.txt"), sep="\t", row.names = F, quote = F)
 
@@ -164,7 +164,7 @@ euk_asv_taxa_filt =
 
 # Export tables 
 write.table(mic_asv_taxa_filt,
-            file=paste0(output_tables,"FRAM_RAS_F4_MIC_ASV_filt_taxa.txt"), sep="\t", quote=F, row.names=F)
+            file=paste0(output_tables,"FRAM_RAS_F4_PROK_ASV_filt_taxa.txt"), sep="\t", quote=F, row.names=F)
 write.table(euk_asv_taxa_filt,
             file=paste0(output_tables,"FRAM_RAS_F4_EUK_ASV_filt_taxa.txt"), sep="\t",quote=F, row.names=F)
 
@@ -174,7 +174,7 @@ write.table(euk_asv_taxa_filt,
 
 # Import gene cluster profile
 gene_raw_abund=read.csv(
-  file="FRAM_RAS_F4_GENE_CLUST_raw_wide.txt",
+  file="FRAM_RAS_F4_GENE_CLUST_raw_counts.txt",
   sep="\t",check.names=F, header=T)
 
 # Import information on the number of genomes sequenced in each metagenome
