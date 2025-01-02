@@ -38,10 +38,10 @@ options(scipen=999)
 ### Import data
 
 # Import Prokaryotic ASV data
-mic_asv_rel=read.table(file=paste0(output_tables,"FRAM_RAS_F4_MIC_ASV_filt_rel.txt"), sep="\t",
+mic_asv_rel=read.table(file=paste0(output_tables,"FRAM_RAS_F4_PROK_ASV_filt_rel.txt"), sep="\t",
                        check.names=F, header=T, row.names=1) 
 
-mic_asv_raw=read.table(file=paste0(output_tables,"FRAM_RAS_F4_MIC_ASV_filt_raw.txt"), sep="\t",
+mic_asv_raw=read.table(file=paste0(output_tables,"FRAM_RAS_F4_PROK_ASV_filt_raw.txt"), sep="\t",
                        check.names=F, header=T, row.names=1) 
 
 # Import Eukaryotic ASV data
@@ -76,7 +76,7 @@ euk_asv_taxa=read.table(file=paste0(output_tables,"FRAM_RAS_F4_EUK_ASV_filt_taxa
                        check.names=F, header=T)
 
 # Import microbial ASV taxa info
-mic_asv_taxa=read.table(file=paste0(output_tables,"FRAM_RAS_F4_MIC_ASV_filt_taxa.txt"), sep="\t",
+mic_asv_taxa=read.table(file=paste0(output_tables,"FRAM_RAS_F4_PROK_ASV_filt_taxa.txt"), sep="\t",
                        check.names=F, header=T)
 
 # Import ASV and gene network cluster assignments
@@ -945,8 +945,9 @@ dev.off()
 # The module kegg functional profiles have already been provided to you
 
 ### Import table containing kegg composition information
+# The below file can not be provided as KEGG is a paid database. The file should contain information mapping KEGG KO's to metabolisms and pathways.
 kegg_db=read.csv(
-  file = "KEGG_database_complete.txt",
+  file = "XXXXXX.txt",
   sep="\t",check.names=F, header=T)
 
 ### Add kegg metabolism information to module functions
