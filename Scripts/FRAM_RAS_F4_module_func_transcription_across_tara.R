@@ -40,7 +40,7 @@ net_mod_to_gene_to_func_to_tax=read.csv(
 
 # Import metatranscriptomic abundances from Tara Oceans Arctic dataset
 gene_clust_tara_abund=read.csv(
-  file="data_files/FRAM_RAS_F4_proteins_all_clust_rep_filt_TOPC_TAD80.txt",
+  file="data_files/FRAM_RAS_F4_GENE_CLUST_filt_TOPC_TAD80.txt",
   sep="\t",check.names=F, header=T)
 
 # Import TaraOcean metadata
