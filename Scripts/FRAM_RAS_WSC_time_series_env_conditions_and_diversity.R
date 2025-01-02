@@ -35,14 +35,14 @@ euk_asv_filt_rare_raw=read.table(file=paste0(output_tables,"FRAM_RAS_F4_EUK_ASV_
   mutate(across(is.numeric, ~ .* 100))
 
 # Import microbial filtered ASV raw and rel abund data
-mic_asv_filt_raw=read.table(file=paste0(output_tables,"FRAM_RAS_F4_MIC_ASV_filt_raw.txt"), sep="\t",
+mic_asv_filt_raw=read.table(file=paste0(output_tables,"FRAM_RAS_F4_PROK_ASV_filt_raw.txt"), sep="\t",
                             check.names=F, header=T, row.names=1)
 
-mic_asv_filt_rare_raw=read.table(file=paste0(output_tables,"FRAM_RAS_F4_MIC_ASV_filt_rare_raw.txt"), sep="\t",
+mic_asv_filt_rare_raw=read.table(file=paste0(output_tables,"FRAM_RAS_F4_PROK_ASV_filt_rare_raw.txt"), sep="\t",
                             check.names=F, header=T, row.names=1)  %>%
   mutate(across(is.numeric, ~ .* 100))
 
-mic_asv_filt_taxa=read.table(file=paste0(output_tables,"FRAM_RAS_F4_MIC_ASV_filt_taxa.txt"), sep="\t",
+mic_asv_filt_taxa=read.table(file=paste0(output_tables,"FRAM_RAS_F4_PROK_ASV_filt_taxa.txt"), sep="\t",
                             check.names=F, header=T, row.names=1)  %>%
   mutate(across(is.numeric, ~ .* 100))
 
@@ -167,7 +167,7 @@ mic_evenness = plot_diversity_metrics(mic_alpha_div_df, Mean_Evenness, "Mean eve
 
 ### Export alpha diversity tables
 write.table(mic_alpha_div_results,
-            file = paste0(output_tables,"FRAM_RAS_F4_MIC_alpha_diversity_metrics.txt"), 
+            file = paste0(output_tables,"FRAM_RAS_F4_PROK_alpha_diversity_metrics.txt"), 
             sep = "\t")
 
 write.table(euk_alpha_div_results,
@@ -280,7 +280,7 @@ euk_alpha_vs_env_cor_sig_df$ci_upper <- ci_upper
 
 ### Export the dataframes containing information on significant correlation results
 write.table(mic_alpha_vs_env_cor_sig_df,
-            file = paste0(output_tables,"FRAM_RAS_F4_MIC_div_vs_env_correlation_df.txt"), 
+            file = paste0(output_tables,"FRAM_RAS_F4_PROK_div_vs_env_correlation_df.txt"), 
             sep = "\t")
 
 write.table(euk_alpha_vs_env_cor_sig_df,
@@ -316,7 +316,7 @@ mic_div_vs_env_sig_cor_plot = plot_sig_cor_hits(mic_alpha_vs_env_cor_sig_df)
 
 ### Combine plots and export
 library(patchwork)
-pdf(file=paste0(output_figures,"RAS_F4_MIC_EUK_ASV_diversity_and_correlations.pdf"),
+pdf(file=paste0(output_figures,"RAS_F4_PROK_EUK_ASV_diversity_and_correlations.pdf"),
     height=10, width = 16)
 ((mic_richness+remove_x_axis)/(mic_evenness+remove_x_axis)/mic_shannon/mic_div_vs_env_sig_cor_plot)|
   ((euk_richness+remove_x_axis)/(euk_evenness+remove_x_axis)/euk_shannon/euk_div_vs_env_sig_cor_plot)
@@ -406,7 +406,7 @@ euk_asv_bray_nmds_plot_with_hulls =
         axis.title.y = element_text(size =12))
 
 ### combine plots and export
-pdf(file=paste0(output_figures,"FRAM_RAS_F4_MIC_and_EUK_NMDS_plots.pdf"),
+pdf(file=paste0(output_figures,"FRAM_RAS_F4_PROK_and_EUK_NMDS_plots.pdf"),
     height=12, width = 8)
 mic_asv_bray_nmds_plot_with_hulls/euk_asv_bray_nmds_plot_with_hulls
 dev.off()
@@ -444,4 +444,4 @@ mic_and_euk_convex_hull_areas <- data.frame(month = months, microeukaryotic_hull
 
 # Export
 write.table(mic_and_euk_convex_hull_areas, 
-            file = paste0(output_tables,"FRAM_RAS_F4_MIC_EUK_NMDS_convex_hull_areas.txt"),sep="\t")
+            file = paste0(output_tables,"FRAM_RAS_F4_PROK_EUK_NMDS_convex_hull_areas.txt"),sep="\t")
