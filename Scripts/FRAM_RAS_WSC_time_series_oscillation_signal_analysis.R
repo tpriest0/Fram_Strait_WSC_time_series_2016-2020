@@ -5,7 +5,7 @@
 ####################
 
 ### Define working directory
-setwd('/nfs/cds-peta/exports/biol_micro_cds_gr_sunagawa/scratch/tpriest/projects/fram_wsc/final_dataset/')
+setwd('XXXXX')
 
 ### Define output directories
 output_figures = ('results/figures/')
