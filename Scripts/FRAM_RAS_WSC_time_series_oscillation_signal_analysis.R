@@ -27,11 +27,11 @@ options(scipen=999)
 ### Import oscillation information
 gene_clust_oscillations = read.table("FRAM_RAS_F4_GENE_CLUST_oscillations_per_year.txt", sep="\t", header=T)
 euk_asv_oscillations = read.table("FRAM_RAS_F4_EUK_oscillations_per_year.txt", sep="\t", header=T)
-prok_asv_oscillations = read.table("FRAM_RAS_F4_MIC_oscillations_per_year.txt", sep="\t", header=T)
+prok_asv_oscillations = read.table("FRAM_RAS_F4_PROK_oscillations_per_year.txt", sep="\t", header=T)
 
 ### Import relative abundance information
 # Import microbial ASV relative abundance data
-mic_asv_rel=read.table(file=paste0(output_tables,"FRAM_RAS_F4_MIC_ASV_filt_rel.txt"), sep="\t",
+mic_asv_rel=read.table(file=paste0(output_tables,"FRAM_RAS_F4_PROK_ASV_filt_rel.txt"), sep="\t",
                        check.names=F, header=T, row.names=1)
 
 # Import EUK ASV relative abundance data
@@ -172,7 +172,7 @@ plot_asv_gene_mean_osc_per_year <- plot_num_oscillations_py(asv_and_geneclust_os
 plot_asv_gene_rel_prop_per_osc <- plot_rel_prop_per_oscillation(asv_gene_rel_prop_per_oscillation)
 
 # Export figure
-pdf(file=paste0(output_figures,"FRAM_RAS_F4_MIC_EUK_ASV_GENE_OSC_per_year_and_rel_abund.pdf"),
+pdf(file=paste0(output_figures,"FRAM_RAS_F4_PROK_EUK_ASV_GENE_OSC_per_year_and_rel_abund.pdf"),
     height=10, width=8)
 plot_asv_gene_mean_osc_per_year|plot_asv_gene_rel_prop_per_osc
 dev.off()
@@ -211,10 +211,10 @@ gene_clust_osc4_rel_wide =
 
 # Export tables
 write.table(mic_euk_asv_gene_clust_osc4_id_list,
-            file=paste0(output_tables,"FRAM_RAS_F4_MIC_EUK_ASVs_GENE_CLUST_OSC4_ID_list.txt"),
+            file=paste0(output_tables,"FRAM_RAS_F4_PROK_EUK_ASVs_GENE_CLUST_OSC4_ID_list.txt"),
             sep="\t", quote = F, row.names = F)
 write.table(mic_asv_osc4_rel_wide,
-            file=paste0(output_tables,"FRAM_RAS_F4_MIC_ASV_OSC4_rel_abund_wide.txt"),
+            file=paste0(output_tables,"FRAM_RAS_F4_PROK_ASV_OSC4_rel_abund_wide.txt"),
             sep="\t", quote = F, row.names = F)
 write.table(euk_asv_osc4_rel_wide,
             file=paste0(output_tables,"FRAM_RAS_F4_EUK_ASV_OSC4_rel_abund_wide.txt"),
@@ -233,7 +233,7 @@ library(lubridate)
 
 # Import table containing information about the sampling time point when
 # each annually oscillating ASV and gene cluster reached peak abundance each year
-mic_asv_gene_osc4_peaks_per_year_julian=read.table(file="RAS_F4_MIC_ASV_GENES_OSC4_peak_timings_julian.txt", 
+mic_asv_gene_osc4_peaks_per_year_julian=read.table(file="FRAM_RAS_F4_PROK_ASV_GENES_OSC4_peak_timings_julian.txt", 
                                   sep="\t", check.names=F, header=T) 
 
 # Using the information, convert the peak sample dates to julian day
