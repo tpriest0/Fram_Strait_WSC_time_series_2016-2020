@@ -29,11 +29,11 @@ library(tibble)
 ### Import data
 
 # Import microbial ASV count data
-mic_asv_raw=read.table(file="FRAM_RAS_F4_PROK_ASV_raw_counts.txt", sep="\t",
+mic_asv_raw=read.table(file="FRAM_RAS_F4_MIC_ASV_raw_counts.txt", sep="\t",
                        check.names=F, header=T)
 
 # Import microbial ASV taxa information
-mic_asv_taxa=read.table(file="FRAM_RAS_F4_PROK_ASV_taxa.txt", sep="\t",
+mic_asv_taxa=read.table(file="FRAM_RAS_F4_MIC_ASV_taxa.txt", sep="\t",
                        check.names=F, header=T)
 
 # Import eukaryotic ASV count data
@@ -77,11 +77,13 @@ euk_asv_filt_raw_wide = euk_asv_raw %>%
 ### Generate relative abundance tables from filtered ASV data
 mic_asv_filt_rel = 
   as.data.frame(mic_asv_filt_raw_wide) %>%
+  tibble::column_to_rownames(., var="ASV_name") %>%
   decostand(., method="total", MARGIN=2) %>%
   tibble::rownames_to_column(., var="ASV_name")
 
 euk_asv_filt_rel = 
   as.data.frame(euk_asv_filt_raw_wide) %>%
+  tibble::column_to_rownames(., var="ASV_name") %>%
   decostand(., method="total", MARGIN=2) %>%
   tibble::rownames_to_column(., var="ASV_name")
 
@@ -101,7 +103,9 @@ head(sort(colSums(mic_asv_filt_raw_wide_mod)))
 
 mic_smallest_count <- min(colSums(mic_asv_filt_raw_wide_mod))
 
-mic_asv_filt_rarefied = t(rrarefy(t(mic_asv_filt_raw_wide_mod), mic_smallest_count))
+mic_asv_filt_rarefied = t(rrarefy(t(mic_asv_filt_raw_wide_mod), mic_smallest_count)) %>%
+  as.data.frame() %>%
+  tibble::rownames_to_column(., var="ASV_name")
 
 ### Microeukaryotic ASVs
 
@@ -113,18 +117,22 @@ head(sort(colSums(euk_asv_filt_raw_wide_mod)))
 euk_asv_filt_raw_wide_mod_subset = subset(euk_asv_filt_raw_wide_mod, select=-c(`02_2018_F4_2`))
 euk_smallest_count <- min(colSums(euk_asv_filt_raw_wide_mod_subset))
 
-euk_asv_filt_rarefied = t(rrarefy(t(euk_asv_filt_raw_wide_mod_subset), euk_smallest_count))
+euk_asv_filt_rarefied = t(rrarefy(t(euk_asv_filt_raw_wide_mod_subset), euk_smallest_count)) %>%
+  as.data.frame() %>%
+  tibble::rownames_to_column(., var="ASV_name")
 
 ### Create relative abundance tables from rarefied data
-mic_asv_filt_rarefied_rel = 
-  as.data.frame(mic_asv_filt_rarefied) %>%
+mic_asv_filt_rarefied_rel = mic_asv_filt_rarefied %>%
+  tibble::column_to_rownames(., var = "ASV_name") %>%
   decostand(., method="total", MARGIN=2) %>%
   tibble::rownames_to_column(., var="ASV_name")
 
-euk_asv_filt_rarefied_rel = 
-  as.data.frame(euk_asv_filt_rarefied) %>%
+euk_asv_filt_rarefied_rel = euk_asv_filt_rarefied %>%
+  tibble::column_to_rownames(., var = "ASV_name") %>%
   decostand(., method="total", MARGIN=2) %>%
   tibble::rownames_to_column(., var="ASV_name")
+
+euk_asv_filt_rel_mod = subset(euk_asv_filt_rel, select=-c(`02_2018_F4_2`))
 
 ### Based on the low counts observed in 02_2018_F4_2, also remove this 
 ### from the filtered relative abundance table as it will not be included
@@ -134,19 +142,19 @@ euk_asv_filt_rel_mod = subset(euk_asv_filt_rel, select=-c(`02_2018_F4_2`))
 ### Export tables
 
 write.table(mic_asv_filt_raw_wide,
-            file=paste0(output_tables,"FRAM_RAS_F4_PROK_ASV_filt_raw.txt"), sep="\t", row.names = F, quote = F)
+            file=paste0(output_tables,"FRAM_RAS_F4_MIC_ASV_filt_raw.txt"), sep="\t", row.names = F, quote = F)
 write.table(mic_asv_filt_rel,
-            file=paste0(output_tables,"FRAM_RAS_F4_PROK_ASV_filt_rel.txt"), sep="\t", row.names = F, quote = F)
+            file=paste0(output_tables,"FRAM_RAS_F4_MIC_ASV_filt_rel.txt"), sep="\t", row.names = F, quote = F)
 write.table(euk_asv_filt_raw_wide,
             file=paste0(output_tables,"FRAM_RAS_F4_EUK_ASV_filt_raw.txt"), sep="\t", row.names = F, quote = F)
 write.table(euk_asv_filt_rel_mod,
             file=paste0(output_tables,"FRAM_RAS_F4_EUK_ASV_filt_rel.txt"), sep="\t", row.names = F, quote = F) 
 write.table(mic_asv_filt_rarefied,
-            file=paste0(output_tables,"FRAM_RAS_F4_PROK_ASV_filt_rare_raw.txt"), sep="\t", row.names = F, quote = F)
+            file=paste0(output_tables,"FRAM_RAS_F4_MIC_ASV_filt_rare_raw.txt"), sep="\t", row.names = F, quote = F)
 write.table(euk_asv_filt_rarefied,
             file=paste0(output_tables,"FRAM_RAS_F4_EUK_ASV_filt_rare_raw.txt"), sep="\t", row.names = F, quote = F)
 write.table(mic_asv_filt_rarefied_rel,
-            file=paste0(output_tables,"FRAM_RAS_F4_PROK_ASV_filt_rare_rel.txt"), sep="\t", row.names = F, quote = F)
+            file=paste0(output_tables,"FRAM_RAS_F4_MIC_ASV_filt_rare_rel.txt"), sep="\t", row.names = F, quote = F)
 write.table(euk_asv_filt_rarefied_rel,
             file=paste0(output_tables,"FRAM_RAS_F4_EUK_ASV_filt_rare_rel.txt"), sep="\t", row.names = F, quote = F)
 
@@ -164,7 +172,7 @@ euk_asv_taxa_filt =
 
 # Export tables 
 write.table(mic_asv_taxa_filt,
-            file=paste0(output_tables,"FRAM_RAS_F4_PROK_ASV_filt_taxa.txt"), sep="\t", quote=F, row.names=F)
+            file=paste0(output_tables,"FRAM_RAS_F4_MIC_ASV_filt_taxa.txt"), sep="\t", quote=F, row.names=F)
 write.table(euk_asv_taxa_filt,
             file=paste0(output_tables,"FRAM_RAS_F4_EUK_ASV_filt_taxa.txt"), sep="\t",quote=F, row.names=F)
 
@@ -174,7 +182,7 @@ write.table(euk_asv_taxa_filt,
 
 # Import gene cluster profile
 gene_raw_abund=read.csv(
-  file="FRAM_RAS_F4_GENE_CLUST_raw_counts.txt",
+  file="FRAM_RAS_F4_GENE_CLUST_raw_wide.txt",
   sep="\t",check.names=F, header=T)
 
 # Import information on the number of genomes sequenced in each metagenome
