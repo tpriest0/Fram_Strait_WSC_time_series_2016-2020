@@ -27,10 +27,15 @@ source("FRAM_RAS_F4_daily_approx.R")
 
 ### Import files
 
+# Import metadata
 rasID=read.delim2("RAS_F4_META.txt")
+
+# Import the dataset whose components you want to calculate oscillation signals for. E.g. the prokaryotic ASV or the gene data.
+# IMPORTANT: you need to import the filtered, relative abundance tables (these are produced by the FRAM_RAS_F4_time_series_preprocessing_data.R script)
 
 mg <- read_delim("RAS_F4_GENE_CLUSTID_filt_rel_wide.txt", delim = "\t", 
                  escape_double = FALSE, trim_ws = TRUE)
+
 mg$Zahl <- NULL
 
 geneName=mg$clusterID
