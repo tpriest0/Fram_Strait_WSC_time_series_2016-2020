@@ -22,8 +22,8 @@ library(data.table)
 
 ### Import oscillation tables
 gene_clust_oscillations = read.table(paste0(output_tables,"FRAM_RAS_F4_GENE_CLUST_oscillations_per_year.txt"), sep="\t", header=T)
-euk_asv_oscillations = read.table(paste0(output_tables,"FRAM_RAS_F4_EUK_oscillations_per_year.txt"), sep="\t", header=T)
-prok_asv_oscillations = read.table(paste0(output_tables,"FRAM_RAS_F4_MIC_oscillations_per_year.txt"), sep="\t", header=T)
+euk_asv_oscillations = read.table(paste0(output_tables,"FRAM_RAS_F4_EUK_ASV_oscillations_per_year.txt"), sep="\t", header=T)
+prok_asv_oscillations = read.table(paste0(output_tables,"FRAM_RAS_F4_MIC_ASV_oscillations_per_year.txt"), sep="\t", header=T)
 
 ### Import relative abudnance tables
 mic_asv_rel=read.table(file=paste0(output_tables,"FRAM_RAS_F4_MIC_ASV_filt_rel.txt"), sep="\t",
