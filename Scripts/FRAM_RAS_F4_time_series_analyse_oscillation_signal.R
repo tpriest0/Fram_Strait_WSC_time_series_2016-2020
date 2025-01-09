@@ -227,14 +227,6 @@ write.table(func_osc4_rel_wide,
             file=paste0(output_tables,"FRAM_RAS_F4_FUNC_osc4_rel_wide.txt"),
             sep="\t", quote = F, row.names = F)
 
-
-#####
-
-### Determine the annual peaks of oscillation signals for those with an oscillation of once per year
-
-#####
-
-            
 #####
 
 ### Assessing the timing of peaks for annually oscillating ASVs and genes
