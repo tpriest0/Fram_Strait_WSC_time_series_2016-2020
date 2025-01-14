@@ -89,5 +89,5 @@ determine_oscillations <- function(input_file, output_file) {
 
 # Apply oscillation signal function to ASV and gene cluster interpolated abundance profiles
 determine_oscillations(paste0(output_tables,"FRAM_RAS_F4_MIC_ASV_interpolated_abundances.txt"), paste0(output_tables,"FRAM_RAS_F4_MIC_ASV_oscillations_per_year.txt"))
-determine_oscillations(paste0(output_tables,"FRAM_RAS_F4_EUK_ASV_interpolated_abund.txt"), paste0(output_tables,"FRAM_RAS_F4_EUK_ASV_oscillations_per_year.txt"))
-determine_oscillations(paste0(output_tables,"FRAM_RAS_F4_GENE_CLUST_interpolated_abund.txt"), paste0(output_tables,"FRAM_RAS_F4_GENE_CLUST_oscillations_per_year.txt"))
+determine_oscillations(paste0(output_tables,"FRAM_RAS_F4_EUK_ASV_interpolated_abundances.txt"), paste0(output_tables,"FRAM_RAS_F4_EUK_ASV_oscillations_per_year.txt"))
+determine_oscillations(paste0(output_tables,"FRAM_RAS_F4_GENE_CLUST_interpolated_abundances.txt"), paste0(output_tables,"FRAM_RAS_F4_GENE_CLUST_oscillations_per_year.txt"))
