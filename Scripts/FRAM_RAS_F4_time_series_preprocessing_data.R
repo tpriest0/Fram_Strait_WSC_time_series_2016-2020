@@ -26,7 +26,9 @@ library(tibble)
 
 #####
 
-### Import data
+### ASV data
+
+#####
 
 # Import microbial ASV count data
 mic_asv_raw=read.table(file="FRAM_RAS_F4_MIC_ASV_raw_counts.txt", sep="\t",
@@ -86,8 +88,6 @@ euk_asv_filt_rel =
   tibble::column_to_rownames(., var="ASV_name") %>%
   decostand(., method="total", MARGIN=2) %>%
   tibble::rownames_to_column(., var="ASV_name")
-
-##### 
 
 ### Rarefy data
 
@@ -158,8 +158,6 @@ write.table(mic_asv_filt_rarefied_rel,
 write.table(euk_asv_filt_rarefied_rel,
             file=paste0(output_tables,"FRAM_RAS_F4_EUK_ASV_filt_rare_rel.txt"), sep="\t", row.names = F, quote = F)
 
-#####
-
 ### Filtering taxa tables based on subset of ASVs
 
 mic_asv_taxa_filt = 
@@ -178,51 +176,79 @@ write.table(euk_asv_taxa_filt,
 
 #####
 
-### Processing and reformatting metagenome gene cluster profiles
+### Metagenome-derived gene cluster data
 
-# Import gene cluster profile
-gene_raw_abund=read.csv(
-  file="FRAM_RAS_F4_GENE_CLUST_raw_wide.txt",
-  sep="\t",check.names=F, header=T)
+#####
 
-# Import information on the number of genomes sequenced in each metagenome
-num_genomes=read.csv(
-  file="FRAM_RAS_F4_num_genomes.txt",
-  sep="\t",check.names=F, header=T)
 
-# Remove genes detected in less than 3 samples
-gene_names = gene_raw_abund %>%
-  tibble::column_to_rownames(., var="clustID") %>%
-  mutate(across(where(is.numeric), function(x) ifelse(x < 3, 0, x))) %>%
-  mutate(across(where(is.numeric), function(x) ifelse(x >= 3, 1, x))) %>%
-  mutate(sums = rowSums(.)) %>%
-  filter(sums >= 3) %>%
-  tibble::rownames_to_column(., var="Gene_clustID") %>%
-  select(Gene_clustID)
+### Read input
+gene_clust_abund = fread(file="FRAM_RAS_F4_proteins_all_clust_rep_abund.txt", 
+    sep="\t", header=T)
 
-# Filter gene count table 
-gene_filt_raw_wide = gene_raw_abund %>%
-  filter(clustID %in% gene_names$Gene_clustID) %>%
-  rename(Gene_clustID = clustID)
+mg_num_genomes = fread(file="FRAM_RAS_F4_num_genomes.txt", 
+    sep="\t", header=T)
 
-# Normalise gene counts by the number of genomes sequenced in each sample
-gene_filt_norm_wide = 
-  gene_filt_raw_wide %>%
-  reshape2::melt(., id.vars="Gene_clustID", variable.name="Sample_name", value.name="Count") %>%
-  left_join(num_genomes, by="Sample_name") %>%
-  mutate(Norm_count = Count/Num_genomes) %>%
-  select(-Count,-Num_genomes) %>%
-  reshape2::dcast(Gene_clustID~Sample_name, value.var="Norm_count", data=.) %>%
-  replace(., is.na(.), 0)
+sample_meta = fread(file="FRAM_RAS_F4_META.txt", 
+    sep="\t", header=T)
 
-# Create relative abundance table from normalised counts
-gene_filt_rel_wide = 
-    gene_filt_norm_wide %>%
-    tibble::column_to_rownames(., var="Gene_clustID") %>%
-    decostand(., method = "total", MARGIN=2) %>%
-    tibble::rownames_to_column(., var="Gene_clustID")
+### Create list of nonsingletons (i.e. remove gene cluster representatives with only one count in one sample)
+gene_clust_abund_filt = gene_clust_abund %>%
+    aggregate(Count~Gene_rep, data=., FUN=sum) %>%
+    filter(., Count >= 2)
+
+### Filer out singletons from abundance table, then normalise the counts by the number of genomes estimated in each sample
+abund_nonsing_raw_and_norm_long = gene_clust_abund %>%
+    filter(., Gene_rep %in% gene_clust_abund_filt$Gene_rep) %>%
+    mutate(Sample = gsub("-","_",Sample)) %>%
+    left_join(mg_num_genomes, by=c("Sample" = "Sample_name")) %>%
+    mutate(Norm_abund = Count/Num_genomes) %>%
+    select(-Num_genomes) %>%
+    left_join(sample_meta, by=c("Sample" = "RAS_sample_names")) %>%
+    select(RAS_id,Gene_rep,Count,Norm_abund)
+
+### Calculate relative abundance based on normalised counts and reformat to wide format relative abundance table
+abund_filt_wide_rel = abund_nonsing_raw_and_norm_long %>%
+    reshape2::dcast(Gene_rep~RAS_id, value.var="Norm_abund", data=.) %>%
+    mutate(across(where(is.numeric), ~replace_na(., 0))) %>%
+    tibble::column_to_rownames(., var="Gene_rep") %>%
+    decostand(., method="total", MARGIN=2) %>%
+    tibble::rownames_to_column(., var="Gene_rep")
+
+### As we are focused on those gene clusters with clear patterns over multiple years, 
+### we will apply a second filtering, to remove those gene clusters with <3 counts in <3 samples.
+selected_genereps = gene_clust_abund %>%
+    filter(., Count >= 3) %>%
+    mutate(Count = 1) %>%
+    aggregate(Count~Gene_rep, data=., FUN=sum) %>%
+    filter(Count >= 3) %>%
+    select(Gene_rep) %>%
+    mutate(clustID = paste0("geneclust_",row_number()))
+
+### Create wide format raw count table for selected gene clusters
+gene_clust_filt_wide_raw = abund_nonsing_raw_and_norm_long %>%
+    filter(., Gene_rep %in% selected_genereps$Gene_rep) %>%
+    left_join(selected_genereps, by="Gene_rep") %>%
+    reshape2::dcast(clustID~RAS_id, value.var="Count", data=.) %>%
+    mutate(across(where(is.numeric), ~replace_na(., 0)))
+
+### Create wide format normalised counts table for selected gene clusters
+gene_clust_filt_wide_norm = abund_nonsing_raw_and_norm_long %>%
+    filter(., Gene_rep %in% selected_genereps$Gene_rep) %>%
+    left_join(selected_genereps, by="Gene_rep") %>%
+    reshape2::dcast(clustID~RAS_id, value.var="Norm_abund", data=.) %>%
+    mutate(across(where(is.numeric), ~replace_na(., 0)))
+
+### Create wide format relative abundance table for selected gene clusters (this file will be the input for the oscillation signal determination)
+gene_clust_filt_wide_rel = abund_filt_wide_rel %>%
+    filter(., Gene_rep %in% selected_genereps$Gene_rep) %>%
+    left_join(selected_genereps, by="Gene_rep") %>%
+    select(-Gene_rep) %>%
+    tibble::column_to_rownames(., var="clustID") %>%
+    tibble::rownames_to_column(., var="clustID")
 
 ### Export tables
-write.table(gene_filt_raw_wide, file=paste0(output_tables,"FRAM_RAS_F4_GENE_CLUST_filt_raw_wide.txt"), sep="\t", row.names=F, quote=F)
-write.table(gene_filt_norm_wide, file=paste0(output_tables,"FRAM_RAS_F4_GENE_CLUST_filt_norm_wide.txt"), sep="\t", row.names=F, quote=F)
-write.table(gene_filt_rel_wide, file=paste0(output_tables,"FRAM_RAS_F4_GENE_CLUST_filt_rel_wide.txt"), sep="\t", row.names=F, quote=F)
+fwrite(gene_clust_filt_wide_raw, file=paste0(output_tables,"FRAM_RAS_F4_GENE_CLUST_filt_raw.txt"), sep="\t", quote=F, row.names=F)
+fwrite(gene_clust_filt_wide_norm, file=paste0(output_tables,"FRAM_RAS_F4_GENE_CLUST_filt_norm.txt"), sep="\t",quote=F, row.names=F)
+fwrite(gene_clust_filt_wide_rel, file=paste0(output_tables,"FRAM_RAS_F4_GENE_CLUST_filt_rel.txt"), sep="\t",quote=F, row.names=F)
+fwrite(abund_nonsing_raw_and_norm_long, file=paste0(output_tables,"FRAM_RAS_F4_GENE_CLUST_nonsing_raw_and_norm.txt"), sep="\t",quote=F, row.names=F)
+fwrite(selected_genereps, file=paste0(output_tables,"FRAM_RAS_F4_GENE_CLUST_filt_name_mapping.txt"), sep="\t",quote=F, row.names=F)
