@@ -27,7 +27,7 @@ required_libraries <- c("segmenTier", "segmenTools", "igraph", "Hmisc", "reshape
 
 ### Function to generate interpolated relative abundance profiles
 
-interpolate_abundances <- function(input_file, ras_id_file, output_file) {
+interpolate_abundances <- function(input_file, ras_id_file, output_abund, output_interpolated) {
   
   # Load the input files
   rel_profile <- read.csv(file=input_file, sep="\t", header=T)
@@ -70,8 +70,10 @@ interpolate_abundances <- function(input_file, ras_id_file, output_file) {
   rel_profile[is.na(rel_profile)] <- 0
   colnames(rel_profile) <- as.character(as.Date(colnames(rel_profile), "%d.%m.%Y"))
   rel_profile <- rel_profile[, order(colnames(rel_profile))]
-  #rel_profile <- rel_profile[, 1:46]
-  
+
+  ### Export dataframe with columns as dates in time order
+  write.table(rel_profile, file = output_abund, quote=F, sep="\t", row.names=T)
+
   # Time series analysis using SegmenTier
   tset <- processTimeseries(rel_profile, use.fft = TRUE, dft.range = 2:12, use.snr = TRUE, na2zero = TRUE)
   ee <- tset$dat
@@ -104,12 +106,12 @@ interpolate_abundances <- function(input_file, ras_id_file, output_file) {
   colnames(dap_set2All$ee) <- as.character(dap_set2All$dtw)
   
   # Write the results to a CSV file
-  write.table(dap_set2All$ee, file = output_file, quote=F, sep="\t")
+  write.table(dap_set2All$ee, file = output_interpolated, quote=F, sep="\t")
   
   # User feedback
   cat("File processing completed. Results saved in:", output_file, "\n")
 }
 
-interpolate_abundances(paste0(output_tables,"FRAM_RAS_F4_MIC_ASV_filt_rel.txt"), "FRAM_RAS_F4_META.txt", paste0(output_tables,"FRAM_RAS_F4_MIC_ASV_interpolated_abundances.txt"))
-interpolate_abundances(paste0(output_tables,"FRAM_RAS_F4_EUK_ASV_filt_rel.txt"), "FRAM_RAS_F4_META.txt", paste0(output_tables,"FRAM_RAS_F4_EUK_ASV_interpolated_abundances.txt"))
-interpolate_abundances(paste0(output_tables,"FRAM_RAS_F4_GENE_CLUST_filt_rel.txt"), "FRAM_RAS_F4_META.txt", paste0(output_tables,"FRAM_RAS_F4_GENE_CLUST_interpolated_abundances.txt"))
+interpolate_abundances(paste0(output_tables,"FRAM_RAS_F4_MIC_ASV_filt_rel.txt"), "FRAM_RAS_F4_META.txt", paste0(output_tables,"FRAM_RAS_F4_MIC_ASV_filt_rel-date_columns.txt"), paste0(output_tables,"FRAM_RAS_F4_MIC_ASV_interpolated_abundances.txt"))
+interpolate_abundances(paste0(output_tables,"FRAM_RAS_F4_EUK_ASV_filt_rel.txt"), "FRAM_RAS_F4_META.txt", paste0(output_tables,"FRAM_RAS_F4_EUK_ASV_filt_rel-date_columns.txt"), paste0(output_tables,"FRAM_RAS_F4_EUK_ASV_interpolated_abundances.txt"))
+interpolate_abundances(paste0(output_tables,"FRAM_RAS_F4_GENE_CLUST_filt_rel.txt"), "FRAM_RAS_F4_META.txt", paste0(output_tables,"FRAM_RAS_F4_GENE_CLUST_filt_rel-date_columns.txt"), paste0(output_tables,"FRAM_RAS_F4_GENE_CLUST_interpolated_abundances.txt"))
