@@ -5,20 +5,25 @@
 ####################
 
 ### Define working directory
-setwd('XXXXXX')
+setwd('XXXXX')
 
-### Define output directories
+### Define directories
 output_figures = ('results/figures/')
 output_tables = ('results/tables/')
+scripts = ("scripts/")
+
+### Load necessary scripts
+source(paste0(scripts,"FRAM_RAS_F4_calcTimeSeriesInfo.R"))
+source(paste0(scripts,"FRAM_RAS_F4_daily_approx.R"))
 
 ### Load libraries
-library(stringr)
-library(dplyr)
-library(ggplot2)
-library(reshape2)
-library(tibble)
-library(patchwork)
-library(data.table)
+required_libraries <- c("segmenTier", "segmenTools", "stringr", "dplyr", "reshape2", "ggplot2", "readr", "tibble", "patchwork", "data.table", "lubridate")
+  for (lib in required_libraries) {
+    if (!require(lib, character.only = TRUE)) {
+      install.packages(lib, dependencies = TRUE)
+      library(lib, character.only = TRUE)
+    }
+  }
 
 ### Import oscillation tables
 gene_clust_oscillations = read.table(paste0(output_tables,"FRAM_RAS_F4_GENE_CLUST_oscillations_per_year.txt"), sep="\t", header=T)
@@ -31,22 +36,22 @@ mic_asv_rel=read.table(file=paste0(output_tables,"FRAM_RAS_F4_MIC_ASV_filt_rel.t
 euk_asv_rel=read.table(file=paste0(output_tables,"FRAM_RAS_F4_EUK_ASV_filt_rel.txt"), sep="\t",
                        check.names=F, header=T, row.names=1)
 gene_clust_rel=read.table(
-  file=paste0(output_tables,"FRAM_RAS_F4_GENE_CLUST_filt_rel_wide.txt"), 
+  file=paste0(output_tables,"FRAM_RAS_F4_GENE_CLUST_filt_rel.txt"), 
   sep="\t", check.names=F, header=T, row.names=1)
 
 ### Combine oscillation from asvs and gene clusters together
 asv_and_geneclust_oscillations = rbind(gene_clust_oscillations,euk_asv_oscillations,prok_asv_oscillations) %>%
     mutate(Type = case_when(
-        grepl("prok",nodeId) ~ "Prok",
-        grepl("euk",nodeId) ~ "Euk",
-        grepl("gene",nodeId) ~ "Gene_clust"
+        grepl("prok",ID) ~ "Prok",
+        grepl("euk",ID) ~ "Euk",
+        grepl("gene",ID) ~ "Gene_clust"
     ))
 
 ### Assess the oscillation signal data retrieved from the time-series analysis
 # Calculate the mean oscillations per year
 asv_and_geneclust_oscillations_mean = 
     asv_and_geneclust_oscillations %>%
-    aggregate(oscillations~nodeId+Type, data=., FUN=mean) %>%
+    aggregate(oscillations~ID+Type, data=., FUN=mean) %>%
     mutate(Type = factor(Type, levels=c("Prok","Euk","Gene_clust")))
 
 # For how many ASVs and gene clusters could oscillations be determined? And
@@ -88,11 +93,11 @@ asv_and_geneclust_oscillations_mean %>%
 calc_rel_abund_per_osc <- function(infile){
   osc_abund_df = 
     infile %>% 
-    tibble::rownames_to_column(., var="nodeId") %>%
-    filter(nodeId %in% asv_and_geneclust_oscillations_mean$nodeId) %>%
-    reshape2::melt(id.vars="nodeId", variable.name="RAS_id", value.name="Rel_abund") %>%
+    tibble::rownames_to_column(., var="ID") %>%
+    filter(ID %in% asv_and_geneclust_oscillations_mean$ID) %>%
+    reshape2::melt(id.vars="ID", variable.name="RAS_id", value.name="Rel_abund") %>%
     filter(., Rel_abund > 0) %>%
-    left_join(asv_and_geneclust_oscillations_mean, by="nodeId") %>%
+    left_join(asv_and_geneclust_oscillations_mean, by="ID") %>%
     mutate(Rel_abund = as.numeric(Rel_abund)*100) %>%
     aggregate(Rel_abund~RAS_id+Type+oscillations, data=., FUN=sum)
   return(osc_abund_df)
@@ -164,28 +169,28 @@ dev.off()
 mic_euk_asv_gene_clust_osc4_id_list = 
   asv_and_geneclust_oscillations_mean %>%
   filter(., oscillations == 1) %>%
-  select(nodeId)
+  select(ID)
 
 ### Create relative abundance dataframes for those with one oscillation per year as these will be 
 ### used as the input for network analysis
 mic_asv_osc4_rel_wide = 
   mic_asv_rel %>%
-  tibble::rownames_to_column(., var="nodeId") %>%
-  filter(nodeId %in% mic_euk_asv_gene_clust_osc4_id_list$nodeId)
+  tibble::rownames_to_column(., var="ID") %>%
+  filter(ID %in% mic_euk_asv_gene_clust_osc4_id_list$ID)
 
 euk_asv_osc4_rel_wide = 
   euk_asv_rel %>%
-  tibble::rownames_to_column(., var="nodeId") %>%
-  filter(nodeId %in% mic_euk_asv_gene_clust_osc4_id_list$nodeId)
+  tibble::rownames_to_column(., var="ID") %>%
+  filter(ID %in% mic_euk_asv_gene_clust_osc4_id_list$ID)
 
 gene_clust_osc4_rel_wide = 
   gene_clust_rel %>%
-  tibble::rownames_to_column(., var="nodeId") %>%
-  filter(nodeId %in% mic_euk_asv_gene_clust_osc4_id_list$nodeId)
+  tibble::rownames_to_column(., var="ID") %>%
+  filter(ID %in% mic_euk_asv_gene_clust_osc4_id_list$ID)
 
 # Export tables
 write.table(mic_euk_asv_gene_clust_osc4_id_list,
-            file=paste0(output_tables,"FRAM_RAS_F4_MIC_EUK_ASVs_GENE_CLUST_OSC4_ID_list.txt"),
+            file=paste0(output_tables,"FRAM_RAS_F4_ASV_GENE_CLUST_OSC4_ID_list.txt"),
             sep="\t", quote = F, row.names = F)
 write.table(mic_asv_osc4_rel_wide,
             file=paste0(output_tables,"FRAM_RAS_F4_MIC_ASV_OSC4_rel_abund_wide.txt"),
@@ -213,13 +218,13 @@ gene_to_func_to_tax=read.table(
 # sum the abundances of gene clusters for each function in each sample. This will
 # generate an abundance profile for the functional clusters
 func_osc4_rel_wide = gene_clust_osc4_rel_wide %>%
-  filter(nodeId %in% gene_to_func_to_tax$Gene_clustID) %>%
-  left_join(gene_to_func_to_tax, by=c("nodeId" = "Gene_clustID")) %>%
-  select(-nodeId,-GTDB_taxonomy,-Domain_tiara,-FUNC,-Gene) %>%
-  reshape2::melt(., id.vars=c("funcID"), variable.name="RAS_id",
+  filter(ID %in% gene_to_func_to_tax$GeneClustID) %>%
+  left_join(gene_to_func_to_tax, by=c("ID" = "GeneClustID")) %>%
+  select(-ID,-GTDB_taxonomy,-Domain_tiara,-FUNC,-Gene) %>%
+  reshape2::melt(., id.vars=c("FuncClustID"), variable.name="RAS_id",
                  value.name="Rel_abund") %>%
-  aggregate(Rel_abund~funcID+RAS_id, data=., FUN=sum) %>%
-  reshape2::dcast(funcID~RAS_id, value.var="Rel_abund", data=.)
+  aggregate(Rel_abund~FuncClustID+RAS_id, data=., FUN=sum) %>%
+  reshape2::dcast(FuncClustID~RAS_id, value.var="Rel_abund", data=.)
 
 # The functional profile will now be subject to fourier transformation and then
 # combined with the prokaryotic ASV oscillations in a network analysis
@@ -227,47 +232,91 @@ write.table(func_osc4_rel_wide,
             file=paste0(output_tables,"FRAM_RAS_F4_FUNC_osc4_rel_wide.txt"),
             sep="\t", quote = F, row.names = F)
 
-#####
 
-### Assessing the timing of peaks for annually oscillating ASVs and genes
+### Now apply the same function used to interpolate the abundances of ASVs and gene clusters to the 
+### functional relative abundance profile of functions, as this will be used in the network analysis
 
-#####
+### Function to generate interpolated relative abundance profiles
+interpolate_abundances <- function(input_file, ras_id_file, output_file) {
+  
+  # Load the input files
+  rel_profile <- read_delim(input_file, delim = "\t", escape_double = FALSE, trim_ws = TRUE)
+  # Erste Spalte als rownames setzen (und aus den Daten entfernen, falls nötig)
+  rn = rel_profile[[1]]
+  rel_profile[,1] <- NULL
+  rownames(rel_profile) <- rn # Zeilennamen zuweisen
+  metadata <- read.delim2(ras_id_file)
+  
+  # Extract ASV names and adjust columns
+  ID <- rownames(rel_profile)
+  rel_profile <- rel_profile[, 2:ncol(rel_profile)]
+  id <- colnames(rel_profile)
+  id <- gsub("X([0-9])_", "0\1_", id)
+  id <- gsub("X", "", id)
+  
+  # Match IDs and assign dates
+  mi <- match(id, metadata$RAS_id)
+  dt <- metadata$date[mi]
+  colnames(rel_profile) <- dt
+  
+  # Order data by time
+  oi <- order(dt)
+  rel_profile <- rel_profile[, oi]
+  rel_profile <- apply(rel_profile, 2, as.numeric)
+  rownames(rel_profile) <- rn
+  
+  # Calculate NaNs per row and filter
+  nans_per_row <- apply(rel_profile, 1, function(x) sum(is.na(x)))
+  num_of_genes <- length(nans_per_row)
+  wi <- which(nans_per_row < 44)  # Keep rows with fewer than 44 NaNs
+  rel_profile <- rel_profile[wi, ]
+  
+  # Filter statistics
+  num_genes_filtered <- length(wi)
+  drop_out_rate <- 1 - (num_genes_filtered / num_of_genes)
+  
+  # Replace all NaNs with 0 and sort by date
+  rel_profile[is.na(rel_profile)] <- 0
+  colnames(rel_profile) <- as.character(as.Date(colnames(rel_profile), "%d.%m.%Y"))
+  rel_profile <- rel_profile[, order(colnames(rel_profile))]
+  #rel_profile <- rel_profile[, 1:46]
+  
+  # Time series analysis using SegmenTier
+  tset <- processTimeseries(rel_profile, use.fft = TRUE, dft.range = 2:12, use.snr = TRUE, na2zero = TRUE)
+  ee <- tset$dat
+  
+  # Remove rows with only NAs
+  ee1 <- ee[rowSums(is.na(ee)) != ncol(ee), ]
+  
+  # Calculate time series signals
+  allTS <- apply(ee1, 1, calcTimeSeriesInfo)
+  
+  # Extract sinus model data
+  xx <- lapply(allTS, function(x) x$mod_dataTS)
+  xx <- do.call("rbind", xx)
+  xx <- apply(xx, 1, function(x) (x - min(x)) / max(x - min(x)))
+  xx <- t(xx)
+  
+  # Define time variable (one sinus cycle = one year)
+  ts <- seq(0, 2 * pi, length.out = ncol(xx))
+  
+  # Calculate phase and frequency
+  yy <- lapply(allTS, function(x) x$phase_freq)
+  yy <- do.call("rbind", yy)
+  
+  # Sort data by frequency
+  yy <- as.data.frame(cbind(yy, ii = seq(nrow(yy))))
+  yy_sorted <- yy[order(yy$freq), ]
+  
+  # Daily approximation
+  dap_set2All <- daily_approx(as.Date(colnames(tset$ts)), tset$ts, fix = FALSE)
+  colnames(dap_set2All$ee) <- as.character(dap_set2All$dtw)
+  
+  # Write the results to a CSV file
+  write.table(dap_set2All$ee, file = output_file, quote=F, sep="\t")
+  
+  # User feedrel_profilek
+  cat("File processing completed. Results saved in:", output_file, "\n")
+}
 
-library(lubridate)
-
-# Import table containing information about the sampling time point when
-# each annually oscillating ASV and gene cluster reached peak abundance each year
-mic_asv_gene_osc4_peaks_per_year_julian=read.table(file="RAS_F4_MIC_ASV_GENES_OSC4_peak_timings_julian.txt", 
-                                  sep="\t", check.names=F, header=T) 
-
-# Using the information, convert the peak sample dates to julian day
-# and compare the all years to year 1 to identify those that oscillated
-# within a 30 day window consistently across years
-mic_asv_gene_osc_within_30_days = 
-  mic_asv_gene_osc4_peaks_per_year_julian %>%
-  mutate(date1_julian = lubridate::yday(date1)) %>%
-  mutate(date2_julian = lubridate::yday(date2)) %>%
-  mutate(date3_julian = lubridate::yday(date3)) %>%
-  select(ID,date1_julian,date2_julian,date3_julian) %>%
-  mutate(
-    peak_timings = case_when(
-      ((date2_julian <= date1_julian+15 & date2_julian >= date1_julian-15) &
-        (date3_julian <= date1_julian+15 & date3_julian >= date1_julian-15)) |
-        ((date2_julian <= date1_julian+30 & date2_julian >= date1_julian) &
-           (date3_julian <= date1_julian+30 & date3_julian >= date1_julian)) | 
-        ((date2_julian <= date1_julian & date2_julian >= date1_julian-30) &
-           (date3_julian <= date1_julian & date3_julian >= date1_julian-30)) ~ "recurred_in_window",
-      TRUE ~ "No"
-    )) %>%
-  filter(peak_timings == "recurred_in_window")
-
-### How many of the Microbial ASVs and gene clusters recurred within a 30day period
-### each year?
-mic_asv_gene_osc_within_30_days %>%
-  mutate(type = case_when(
-    ID = grepl("prok_asv",ID) ~ "PROK_ASV",
-    ID = grepl("euk_asv",ID) ~ "EUK_ASV",
-    ID = grepl("Cluster",ID) ~ "gene",
-  )) %>%
-  select(type) %>%
-  table()
+interpolate_abundances(paste0(output_tables,"FRAM_RAS_F4_FUNC_osc4_rel_wide.txt"), "FRAM_RAS_F4_META.txt", paste0(output_tables,"FRAM_RAS_F4_FUNC_osc4_interpolated_abundances.txt"))
