@@ -1,3 +1,9 @@
+#####
+
+### Daily interpolation of abundances
+
+#####
+
 ### Define working directory
 setwd('XXXXX')
 
